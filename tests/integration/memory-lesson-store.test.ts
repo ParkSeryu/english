@@ -45,7 +45,7 @@ describe("MemoryExpressionStore integration behavior", () => {
     expect((await store.updateQuestionNote(question.id, { status: "asked" })).status).toBe("asked");
 
     const queue = await store.getMemorizationQueue();
-    expect(queue[0].id).toBe(expression.id);
+    expect(queue.map((item) => item.id)).not.toContain(expression.id);
   });
 
   it("shares expression content but keeps questions and expression progress user-scoped", async () => {

@@ -47,6 +47,21 @@ describe("scheduleMemorizationQueue", () => {
     expect(queue.map((candidate) => candidate.id)).toEqual(["first", "second"]);
   });
 
+  it("keeps recently known expressions out of the queue for 24 hours", () => {
+    const queue = scheduleMemorizationQueue(
+      [
+        card({ id: "known-today", known_count: 1, unknown_count: 0, last_result: "known", last_reviewed_at: "2026-04-28T10:00:00.000Z" }),
+        card({ id: "known-yesterday", known_count: 1, unknown_count: 0, last_result: "known", last_reviewed_at: "2026-04-27T09:59:59.000Z" }),
+        card({ id: "unknown-today", known_count: 0, unknown_count: 1, last_result: "unknown", last_reviewed_at: "2026-04-28T10:00:00.000Z" }),
+        card({ id: "never", last_result: null, last_reviewed_at: null })
+      ],
+      10,
+      new Date("2026-04-28T11:00:00.000Z")
+    );
+
+    expect(queue.map((candidate) => candidate.id)).toEqual(["unknown-today", "never", "known-yesterday"]);
+  });
+
   it("keeps queues small and configurable", () => {
     const cards = Array.from({ length: 12 }, (_, index) => card({ id: String(index), source_order: index }));
     expect(scheduleMemorizationQueue(cards, 5)).toHaveLength(5);

@@ -82,7 +82,7 @@ Each expression card supports:
   - `맞췄음`
   - `모름`
 - `모름` marks the current learner's state as unknown (`unknown_count: 1`, `known_count: 0`) and makes the card appear more frequently for that learner; repeated taps on the same expression do not stack beyond 1.
-- `맞췄음` marks the current learner's state as known (`known_count: 1`, `unknown_count: 0`) and lowers priority for that learner.
+- `맞췄음` marks the current learner's state as known (`known_count: 1`, `unknown_count: 0`) and removes the card from that learner's memorize queue for 24 hours.
 
 ### MVP review scheduling
 
@@ -90,10 +90,10 @@ MVP should use a simple, understandable heuristic instead of a full SRS engine:
 
 1. Higher `unknown_count` first.
 2. Never-reviewed cards stay near the front.
-3. Cards marked known move later.
-4. Tie-break by least recently reviewed, then original order.
+3. Cards marked known are hidden for 24 hours after `last_reviewed_at`.
+4. After the 24-hour known cooldown, tie-break by known state, least recently reviewed, then original order.
 
-A short cooldown can be added later if immediate repeats become annoying, but it is intentionally excluded from this MVP implementation.
+The cooldown is intentionally simple: it only applies to cards whose latest result is `known`; cards marked `unknown` remain eligible immediately.
 
 ### Grammar/point support
 

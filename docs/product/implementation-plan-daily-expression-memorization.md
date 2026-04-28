@@ -35,7 +35,8 @@ Rebuild the current lesson-oriented app into a daily expression memorization app
 - Replace status scheduling with counter-based queue:
   - unknown desc,
   - never-reviewed boost,
-  - known count penalty,
+  - known 24-hour cooldown,
+  - known state penalty after cooldown,
   - least recently reviewed,
   - source order.
 
@@ -94,7 +95,7 @@ The repository still reflects the previous lesson/review MVP in the worker basel
 
 - `lib/types.ts` is still centered on `Lesson`, `StudyItem`, lesson examples, and status values (`new`, `learning`, `memorized`, `confusing`). The new domain types should be introduced as the primary app contract instead of adapting the old status model.
 - `lib/validation.ts` currently validates lesson ingestion payloads and only accepts `YYYY-MM-DD` dates. It needs an expression-day schema with compact-date normalization for `260427`, `20260427`, and already-normalized `YYYY-MM-DD` inputs.
-- `lib/scheduling.ts` currently orders by legacy status. Replace this with an unknown-weighted expression queue that prioritizes `unknown_count`, never-reviewed cards, known-count penalty, least-recent review, and source order.
+- `lib/scheduling.ts` currently orders by legacy status. Replace this with an unknown-weighted expression queue that prioritizes `unknown_count`, never-reviewed cards, a 24-hour cooldown for cards whose latest result is `known`, known-state penalty after cooldown, least-recent review, and source order.
 - `lib/lesson-store.ts` mixes persistence, ingestion approval, review updates, and memory test state for lesson records. Rename or replace it with an `ExpressionStore` surface so UI and tests no longer depend on lesson terminology for the new path.
 - `components/AppNav.tsx` is a top header with `레슨` and `복습`; the MVP requires a mobile bottom GNB containing `표현`, `암기`, and `질문거리`, with Questions always reachable.
 - Existing pages under `/lessons`, `/items`, `/review`, and `/cards` can remain as redirects/rollback affordances, but the primary routes must be `/expressions`, `/expressions/[id]`, `/memorize`, and `/questions`.
@@ -163,7 +164,7 @@ Before final integration, verify all of the following against the PRD and test s
 - [x] Explicit approval inserts exactly one expression day with its expressions for the configured owner.
 - [x] Non-approval Korean feedback such as `좋네`, `괜찮아`, or `이 문장 자연스러워?` does not insert.
 - [x] Memorization starts Korean-first and hides English until reveal.
-- [x] `모름` marks the expression as currently unknown (`unknown_count: 1`, `known_count: 0`) without repeated-tap stacking; `맞췄음` marks it known (`known_count: 1`, `unknown_count: 0`); both increment `review_count`.
+- [x] `모름` marks the expression as currently unknown (`unknown_count: 1`, `known_count: 0`) without repeated-tap stacking; `맞췄음` marks it known (`known_count: 1`, `unknown_count: 0`) and removes it from that user's memorize queue for 24 hours; both increment `review_count`.
 - [x] Queue ordering visibly favors higher `unknown_count` without immediately requiring complex SRS.
 - [x] Questions bottom tab supports quick add, asked, reopen, and open-first sorting.
 - [x] RLS denies anon access, allows shared expression reads to authenticated users, and keeps progress/questions user-scoped.

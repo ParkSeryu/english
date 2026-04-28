@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { signOutAction } from "@/app/actions";
+import { BottomNav } from "@/components/BottomNav";
 import type { UserIdentity } from "@/lib/types";
 
 export function AppNav({ user }: { user: UserIdentity | null }) {
@@ -14,15 +15,7 @@ export function AppNav({ user }: { user: UserIdentity | null }) {
           </nav>
         </div>
       </header>
-      {user ? (
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden" aria-label="하단 주요 메뉴">
-          <div className="mx-auto grid max-w-3xl grid-cols-3 px-2 py-2 text-center text-xs font-black text-slate-700">
-            <Link href="/expressions" className="rounded-2xl px-2 py-3 hover:bg-teal-50 hover:text-teal-700">표현</Link>
-            <Link href="/memorize" className="rounded-2xl px-2 py-3 hover:bg-teal-50 hover:text-teal-700">암기</Link>
-            <Link href="/questions" className="rounded-2xl px-2 py-3 hover:bg-teal-50 hover:text-teal-700">질문거리</Link>
-          </div>
-        </nav>
-      ) : null}
+      {user ? <BottomNav /> : null}
     </>
   );
 }

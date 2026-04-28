@@ -1,7 +1,9 @@
 import type { ExpressionCard } from "@/lib/types";
 
-type MemorizationCandidate = Pick<ExpressionCard, "id" | "unknown_count" | "known_count" | "last_reviewed_at" | "source_order"> &
+type MemorizationCandidate = Pick<ExpressionCard, "id" | "unknown_count" | "known_count" | "last_reviewed_at" | "last_result" | "source_order"> &
   Partial<Pick<ExpressionCard, "created_at">>;
+
+const KNOWN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 function reviewedRank(card: MemorizationCandidate): number {
   if (!card.last_reviewed_at) return Number.NEGATIVE_INFINITY;
@@ -32,8 +34,15 @@ export function compareExpressionsForMemorization<T extends MemorizationCandidat
   return a.source_order - b.source_order || createdRank(a) - createdRank(b);
 }
 
-export function scheduleMemorizationQueue<T extends MemorizationCandidate>(cards: T[], limit = 10) {
-  return [...cards].sort(compareExpressionsForMemorization).slice(0, limit);
+function isKnownCoolingDown(card: MemorizationCandidate, now: Date) {
+  if (card.last_result !== "known" || card.known_count <= 0 || card.unknown_count > 0 || !card.last_reviewed_at) return false;
+  const lastReviewed = Date.parse(card.last_reviewed_at);
+  if (!Number.isFinite(lastReviewed)) return false;
+  return now.getTime() - lastReviewed < KNOWN_COOLDOWN_MS;
+}
+
+export function scheduleMemorizationQueue<T extends MemorizationCandidate>(cards: T[], limit = 10, now = new Date()) {
+  return [...cards].filter((card) => !isKnownCoolingDown(card, now)).sort(compareExpressionsForMemorization).slice(0, limit);
 }
 
 export const scheduleMemorizeQueue = scheduleMemorizationQueue;
