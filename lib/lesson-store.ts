@@ -164,6 +164,8 @@ class SupabaseExpressionStore implements ExpressionStore {
       .update({
         known_count: existing.known_count + (result === "known" ? 1 : 0),
         unknown_count: existing.unknown_count + (result === "unknown" ? 1 : 0),
+        review_count: existing.review_count + 1,
+        last_result: result,
         last_reviewed_at: timestamp,
         updated_at: timestamp
       })
@@ -189,7 +191,7 @@ class SupabaseExpressionStore implements ExpressionStore {
       .from("question_notes")
       .select("*")
       .eq("owner_id", this.user.id)
-      .order("status", { ascending: true })
+      .order("status", { ascending: false })
       .order("updated_at", { ascending: false });
     if (error) throw error;
     return (data ?? []) as QuestionNote[];
@@ -277,8 +279,8 @@ class SupabaseExpressionStore implements ExpressionStore {
         structure_note: card.structure_note ?? null,
         grammar_note: card.grammar_note ?? null,
         user_memo: card.user_memo ?? null,
-        source_order: index,
-        updated_at: timestamp
+          source_order: index,
+          updated_at: timestamp
       }));
       const { data: insertedExpressions, error: expressionError } = await supabase.from("expressions").insert(expressionRows).select("*");
       if (expressionError) throw expressionError;
@@ -380,6 +382,8 @@ export class MemoryExpressionStore implements ExpressionStore {
     const timestamp = nowIso();
     if (result === "known") located.card.known_count += 1;
     else located.card.unknown_count += 1;
+    located.card.review_count += 1;
+    located.card.last_result = result;
     located.card.last_reviewed_at = timestamp;
     located.card.updated_at = timestamp;
     located.day.updated_at = timestamp;
@@ -397,7 +401,10 @@ export class MemoryExpressionStore implements ExpressionStore {
   }
 
   async listQuestionNotes() {
-    return memoryState().questionNotes.filter((note) => note.owner_id === this.user.id).sort((a, b) => a.status.localeCompare(b.status) || Date.parse(b.updated_at) - Date.parse(a.updated_at)).map((note) => ({ ...note }));
+    return memoryState()
+      .questionNotes.filter((note) => note.owner_id === this.user.id)
+      .sort((a, b) => b.status.localeCompare(a.status) || Date.parse(b.updated_at) - Date.parse(a.updated_at))
+      .map((note) => ({ ...note }));
   }
 
   async createQuestionNote(input: QuestionNoteInput) {
@@ -471,6 +478,8 @@ export class MemoryExpressionStore implements ExpressionStore {
           source_order: index,
           known_count: 0,
           unknown_count: 0,
+          review_count: 0,
+          last_result: null,
           last_reviewed_at: null,
           created_at: timestamp,
           updated_at: timestamp,

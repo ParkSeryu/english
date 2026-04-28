@@ -1,12 +1,21 @@
 import type { ExpressionCard } from "@/lib/types";
 
-function reviewedRank(card: ExpressionCard): number {
+type MemorizationCandidate = Pick<ExpressionCard, "id" | "unknown_count" | "known_count" | "last_reviewed_at" | "source_order"> &
+  Partial<Pick<ExpressionCard, "created_at">>;
+
+function reviewedRank(card: MemorizationCandidate): number {
   if (!card.last_reviewed_at) return Number.NEGATIVE_INFINITY;
   const timestamp = Date.parse(card.last_reviewed_at);
   return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
 }
 
-export function compareExpressionsForMemorization(a: ExpressionCard, b: ExpressionCard) {
+function createdRank(card: MemorizationCandidate): number {
+  if (!card.created_at) return 0;
+  const timestamp = Date.parse(card.created_at);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+export function compareExpressionsForMemorization<T extends MemorizationCandidate>(a: T, b: T) {
   const unknownDelta = b.unknown_count - a.unknown_count;
   if (unknownDelta !== 0) return unknownDelta;
 
@@ -20,11 +29,12 @@ export function compareExpressionsForMemorization(a: ExpressionCard, b: Expressi
   const bReviewed = reviewedRank(b);
   if (aReviewed !== bReviewed) return aReviewed < bReviewed ? -1 : 1;
 
-  return a.source_order - b.source_order || Date.parse(a.created_at) - Date.parse(b.created_at);
+  return a.source_order - b.source_order || createdRank(a) - createdRank(b);
 }
 
-export function scheduleMemorizationQueue(cards: ExpressionCard[], limit = 10) {
+export function scheduleMemorizationQueue<T extends MemorizationCandidate>(cards: T[], limit = 10) {
   return [...cards].sort(compareExpressionsForMemorization).slice(0, limit);
 }
 
+export const scheduleMemorizeQueue = scheduleMemorizationQueue;
 export const scheduleReviewQueue = scheduleMemorizationQueue;

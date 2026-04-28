@@ -28,7 +28,7 @@ Implementation is complete only when:
 | Date normalization | Unit | `260427` and `20260427` normalize correctly when unambiguous. |
 | Approval gate | Unit/integration/security | Non-approval feedback does not insert; explicit approval inserts one expression day. |
 | Store insertion | Integration | Expression day and expressions are inserted together and owner-scoped. |
-| Memorization reveal | Component/e2e | Korean is visible before reveal; English hidden until `영어 보기`. |
+| Memorization reveal | Component/e2e | Korean is visible before reveal; English hidden until `정답 보기`. |
 | Review result counters | Integration | `모름` increments `unknown_count`; `맞췄음` increments `known_count`; both update `review_count`. |
 | Queue priority | Unit/integration | Higher unknown count appears before lower unknown/known-heavy items; never-reviewed items remain visible. |
 | Grammar point | Component/e2e | Point displays after reveal/detail but is not the primary prompt. |
@@ -41,7 +41,7 @@ Implementation is complete only when:
 ### AC-001 — LLM can prepare a daily expression day
 
 - Payload contains title, date, raw input, and at least one expression.
-- Each expression has `english_text` and `korean_text`.
+- Each expression has `english` and `korean_prompt`.
 - Optional grammar/naturalness notes are accepted.
 - Malformed payloads are rejected with actionable errors.
 
@@ -54,7 +54,7 @@ Implementation is complete only when:
 ### AC-003 — Memorization hides the answer
 
 - Before reveal: Korean text visible, English hidden.
-- After reveal: English answer and grammar point visible.
+- After reveal: English answer and grammar/structure/nuance support visible.
 - Buttons are `맞췄음` and `모름`.
 
 ### AC-004 — Unknown-weighted queue improves memorization

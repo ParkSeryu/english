@@ -2,10 +2,11 @@
 
 ## Status
 
-- Mode: plan-before-team handoff.
+- Mode: team execution complete.
 - Source PRD: `docs/product/prd-daily-expression-memorization.md`.
 - Source test spec: `docs/product/test-spec-daily-expression-memorization.md`.
 - Prior implementation checkpoint: `f96eebd`.
+- Implementation checkpoint: team-complete merge `6f6fb14`, final fix commit follows this document update.
 
 ## Decision
 
@@ -156,16 +157,16 @@ Owns regression coverage and gate commands.
 
 Before final integration, verify all of the following against the PRD and test spec:
 
-- [ ] No new user-facing primary route depends on `Lesson` or `StudyItem` naming.
-- [ ] LLM ingestion can draft and revise without inserting rows.
-- [ ] Explicit approval inserts exactly one expression day with its expressions for the configured owner.
-- [ ] Non-approval Korean feedback such as `좋네`, `괜찮아`, or `이 문장 자연스러워?` does not insert.
-- [ ] Memorization starts Korean-first and hides English until reveal.
-- [ ] `모름` increments `unknown_count`; `맞췄음` increments `known_count`; both increment `review_count`.
-- [ ] Queue ordering visibly favors higher `unknown_count` without immediately requiring complex SRS.
-- [ ] Questions bottom tab supports quick add, asked, reopen, and open-first sorting.
-- [ ] RLS denies anon/cross-owner access and allows owner-scoped access for new tables.
-- [ ] No voice/pronunciation, speech recognition, gamification, or complex SRS scope was added.
+- [x] No new user-facing primary route depends on `Lesson` or `StudyItem` naming.
+- [x] LLM ingestion can draft and revise without inserting rows.
+- [x] Explicit approval inserts exactly one expression day with its expressions for the configured owner.
+- [x] Non-approval Korean feedback such as `좋네`, `괜찮아`, or `이 문장 자연스러워?` does not insert.
+- [x] Memorization starts Korean-first and hides English until reveal.
+- [x] `모름` increments `unknown_count`; `맞췄음` increments `known_count`; both increment `review_count`.
+- [x] Queue ordering visibly favors higher `unknown_count` without immediately requiring complex SRS.
+- [x] Questions bottom tab supports quick add, asked, reopen, and open-first sorting.
+- [x] RLS denies anon/cross-owner access and allows owner-scoped access for new tables.
+- [x] No voice/pronunciation, speech recognition, gamification, or complex SRS scope was added.
 
 ## Team Work Allocation
 

@@ -6,7 +6,7 @@
 - Rollback checkpoints:
   - `18440a0` previous card MVP checkpoint.
   - `f96eebd` lesson-ingestion implementation checkpoint.
-- Implementation status: planned for team execution.
+- Implementation status: implemented by team execution on 2026-04-28.
 
 ## Product Goal
 
@@ -73,7 +73,7 @@ Each expression card supports:
 ### Memorization flow
 
 - Primary mode: Korean prompt → recall English.
-- English answer is hidden until user taps `영어 보기`.
+- English answer is hidden until user taps `정답 보기`.
 - After reveal, user chooses:
   - `맞췄음`
   - `모름`
@@ -86,9 +86,10 @@ MVP should use a simple, understandable heuristic instead of a full SRS engine:
 
 1. Higher `unknown_count` first.
 2. Never-reviewed cards stay near the front.
-3. Recently answered `모름` cards can reappear after a short cooldown of roughly 3-5 other cards, not immediately next.
-4. Cards with repeated `맞췄음` move later.
-5. Tie-break by least recently reviewed, then original order.
+3. Cards with repeated `맞췄음` move later.
+4. Tie-break by least recently reviewed, then original order.
+
+A short cooldown can be added later if immediate repeats become annoying, but it is intentionally excluded from this MVP implementation.
 
 ### Grammar/point support
 
@@ -105,10 +106,9 @@ Add a bottom GNB tab for quick question notes. Purpose: quickly record things to
 
 Question note MVP fields:
 
-- `body` text.
+- `question_text` text.
 - `status` = `open | asked`.
-- Optional `expression_id` link.
-- Optional `day_id` link.
+- Optional `answer_note`.
 - `created_at`, `updated_at`.
 
 MVP behavior:
@@ -144,7 +144,7 @@ MVP behavior:
 - `id uuid primary key`
 - `owner_id uuid not null references auth.users(id)`
 - `title text not null`
-- `set_date date not null`
+- `day_date date`
 - `raw_input text not null`
 - `created_by text not null default 'llm' check in ('llm', 'user')`
 - `created_at timestamptz not null default now()`
@@ -153,12 +153,13 @@ MVP behavior:
 ### `expressions`
 
 - `id uuid primary key`
-- `day_id uuid not null references expression_days(id) on delete cascade`
+- `expression_day_id uuid not null references expression_days(id) on delete cascade`
 - `owner_id uuid not null references auth.users(id)`
-- `english_text text not null`
-- `korean_text text not null`
-- `grammar_point text`
-- `natural_note text`
+- `english text not null`
+- `korean_prompt text not null`
+- `grammar_note text`
+- `nuance_note text`
+- `structure_note text`
 - `source_order int not null default 0`
 - `unknown_count int not null default 0`
 - `known_count int not null default 0`
@@ -172,9 +173,7 @@ MVP behavior:
 
 - `id uuid primary key`
 - `owner_id uuid not null references auth.users(id)`
-- `day_id uuid references expression_days(id) on delete set null`
-- `expression_id uuid references expressions(id) on delete set null`
-- `body text not null`
+- `question_text text not null`
 - `status text not null default 'open' check in ('open', 'asked')`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
@@ -198,14 +197,13 @@ Reuse or adapt the existing ingestion run concept, but `normalized_payload` shou
 
 ### `/expressions/[id]`
 
-- All English/Korean pairs for that date.
-- Shows grammar point preview.
-- Link into memorization.
+- Single expression detail.
+- Shows English, Korean prompt, grammar/structure/nuance notes, examples, and user memo form.
 
 ### `/memorize`
 
 - Korean prompt only before reveal.
-- Button: `영어 보기`.
+- Button: `정답 보기`.
 - After reveal: English answer, grammar point, `맞췄음`, `모름`.
 - Queue uses unknown-weighted priority.
 

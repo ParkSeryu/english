@@ -9,25 +9,26 @@ type ReviewResult = "known" | "unknown";
 type QuestionStatus = "open" | "asked";
 
 type ExpressionIngestionPayload = {
-  day: { title: string; set_date: string; raw_input: string };
-  expressions: Array<{ english_text: string; korean_text: string; grammar_point?: string; natural_note?: string; source_order?: number }>;
+  expression_day: { title: string; day_date: string; raw_input: string };
+  expressions: Array<{ english: string; korean_prompt: string; grammar_note?: string; nuance_note?: string }>;
 };
 
 type ExpressionCard = {
   id: string;
-  english_text: string;
-  korean_text: string;
+  english: string;
+  korean_prompt: string;
   unknown_count: number;
   known_count: number;
   review_count: number;
   last_result: ReviewResult | null;
+  last_reviewed_at: string | null;
 };
 
-type ExpressionDay = { id: string; owner_id: string; set_date: string; title: string; expressions: ExpressionCard[] };
-type QuestionNote = { id: string; body: string; status: QuestionStatus; expression_id: string | null; day_id: string | null };
+type ExpressionDay = { id: string; owner_id: string; day_date: string; title: string; expressions: ExpressionCard[] };
+type QuestionNote = { id: string; question_text: string; status: QuestionStatus };
 type IngestionRun = { id: string; owner_id: string; status: string };
 
-type ApprovedExpressionDayResult = { day: ExpressionDay; expressionUrls: string[] };
+type ApprovedExpressionDayResult = { expressionDay: ExpressionDay; expressionUrls: string[] };
 
 type MemoryExpressionStoreInstance = {
   createDraft: (payload: ExpressionIngestionPayload) => Promise<IngestionRun>;
@@ -36,11 +37,11 @@ type MemoryExpressionStoreInstance = {
   listExpressionDays: () => Promise<ExpressionDay[]>;
   getExpressionDay: (id: string) => Promise<ExpressionDay | null>;
   getExpression: (id: string) => Promise<ExpressionCard | null>;
-  getMemorizeQueue: (options?: { limit?: number }) => Promise<ExpressionCard[]>;
+  getMemorizationQueue: (options?: { limit?: number }) => Promise<ExpressionCard[]>;
   recordReviewResult: (id: string, result: ReviewResult) => Promise<ExpressionCard>;
-  createQuestionNote: (input: { body: string; dayId?: string; expressionId?: string }) => Promise<QuestionNote>;
+  createQuestionNote: (input: { questionText: string }) => Promise<QuestionNote>;
   listQuestionNotes: () => Promise<QuestionNote[]>;
-  updateQuestionNoteStatus: (id: string, status: QuestionStatus) => Promise<QuestionNote>;
+  updateQuestionNote: (id: string, input: { status: QuestionStatus }) => Promise<QuestionNote>;
 };
 
 type StoreModule = {
@@ -52,23 +53,21 @@ const userA = { id: "00000000-0000-4000-8000-0000000000aa", email: "a@example.co
 const userB = { id: "00000000-0000-4000-8000-0000000000bb", email: "b@example.com" };
 
 const payload: ExpressionIngestionPayload = {
-  day: {
+  expression_day: {
     title: "오늘의 영어표현",
-    set_date: "20260427",
+    day_date: "20260427",
     raw_input: "오늘의 영어표현 (20260427)"
   },
   expressions: [
     {
-      english_text: "The birth rate in Korea is decreasing.",
-      korean_text: "한국의 출산율이 감소하고 있어요.",
-      grammar_point: "decrease = 감소하다",
-      source_order: 0
+      english: "The birth rate in Korea is decreasing.",
+      korean_prompt: "한국의 출산율이 감소하고 있어요.",
+      grammar_note: "decrease = 감소하다"
     },
     {
-      english_text: "I try not to eat.",
-      korean_text: "저는 먹지 않으려고 노력해요.",
-      grammar_point: "try not to + 동사원형",
-      source_order: 1
+      english: "I try not to eat.",
+      korean_prompt: "저는 먹지 않으려고 노력해요.",
+      grammar_note: "try not to + 동사원형"
     }
   ]
 };
@@ -91,54 +90,54 @@ describe("MemoryExpressionStore daily expression behavior", () => {
 
     const revised = await store.reviseDraft(draft.id, {
       ...payload,
-      expressions: [{ ...payload.expressions[0], natural_note: "원문 답은 바꾸지 말고 메모만 추가한다." }]
+      expressions: [{ ...payload.expressions[0], nuance_note: "원문 답은 바꾸지 말고 메모만 추가한다." }]
     });
     expect(revised.status).toBe("revised");
 
     const approved = await store.approveDraft(draft.id, "이대로 앱에 넣어줘");
-    expect(approved.day).toMatchObject({ owner_id: userA.id, set_date: "2026-04-27" });
-    expect(approved.day.expressions).toHaveLength(1);
+    expect(approved.expressionDay).toMatchObject({ owner_id: userA.id, day_date: "2026-04-27" });
+    expect(approved.expressionDay.expressions).toHaveLength(1);
     expect(approved.expressionUrls[0]).toMatch(/^\/expressions\//);
   });
 
   it("records known/unknown counters and prioritizes unknown-heavy queue items", async () => {
     const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
     const store = new MemoryExpressionStore(userA);
-    const { day } = await store.approveDraft((await store.createDraft(payload)).id, "저장해");
+    const { expressionDay } = await store.approveDraft((await store.createDraft(payload)).id, "저장해");
 
-    const unknown = await store.recordReviewResult(day.expressions[1].id, "unknown");
+    const unknown = await store.recordReviewResult(expressionDay.expressions[1].id, "unknown");
     expect(unknown).toMatchObject({ unknown_count: 1, known_count: 0, review_count: 1, last_result: "unknown" });
 
-    const known = await store.recordReviewResult(day.expressions[0].id, "known");
+    const known = await store.recordReviewResult(expressionDay.expressions[0].id, "known");
     expect(known).toMatchObject({ unknown_count: 0, known_count: 1, review_count: 1, last_result: "known" });
 
-    const queue = await store.getMemorizeQueue();
+    const queue = await store.getMemorizationQueue();
     expect(queue[0].id).toBe(unknown.id);
   });
 
   it("keeps expression days, expressions, and question notes owner-scoped", async () => {
     const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
     const storeA = new MemoryExpressionStore(userA);
-    const { day } = await storeA.approveDraft((await storeA.createDraft(payload)).id, "저장해");
-    const question = await storeA.createQuestionNote({ body: "decrease와 reduce 차이를 물어보기", dayId: day.id, expressionId: day.expressions[0].id });
+    const { expressionDay } = await storeA.approveDraft((await storeA.createDraft(payload)).id, "저장해");
+    const question = await storeA.createQuestionNote({ questionText: "decrease와 reduce 차이를 물어보기" });
 
     const storeB = new MemoryExpressionStore(userB);
-    expect(await storeB.getExpressionDay(day.id)).toBeNull();
-    expect(await storeB.getExpression(day.expressions[0].id)).toBeNull();
+    expect(await storeB.getExpressionDay(expressionDay.id)).toBeNull();
+    expect(await storeB.getExpression(expressionDay.expressions[0].id)).toBeNull();
     expect(await storeB.listQuestionNotes()).toEqual([]);
-    await expect(storeB.updateQuestionNoteStatus(question.id, "asked")).rejects.toThrow("Question note not found");
+    await expect(storeB.updateQuestionNote(question.id, { status: "asked" })).rejects.toThrow("Question note not found");
   });
 
   it("lists open questions before asked questions and can reopen them", async () => {
     const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
     const store = new MemoryExpressionStore(userA);
-    const asked = await store.createQuestionNote({ body: "이미 물어본 질문" });
-    await store.updateQuestionNoteStatus(asked.id, "asked");
-    const open = await store.createQuestionNote({ body: "수업 때 물어볼 질문" });
+    const asked = await store.createQuestionNote({ questionText: "이미 물어본 질문" });
+    await store.updateQuestionNote(asked.id, { status: "asked" });
+    const open = await store.createQuestionNote({ questionText: "수업 때 물어볼 질문" });
 
     expect((await store.listQuestionNotes()).map((note) => note.id)).toEqual([open.id, asked.id]);
 
-    const reopened = await store.updateQuestionNoteStatus(asked.id, "open");
+    const reopened = await store.updateQuestionNote(asked.id, { status: "open" });
     expect(reopened.status).toBe("open");
     expect((await store.listQuestionNotes()).filter((note) => note.status === "open")).toHaveLength(2);
   });

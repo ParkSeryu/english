@@ -24,6 +24,8 @@ create table if not exists public.expressions (
   source_order integer not null default 0,
   known_count integer not null default 0 check (known_count >= 0),
   unknown_count integer not null default 0 check (unknown_count >= 0),
+  review_count integer not null default 0 check (review_count >= 0),
+  last_result text check (last_result in ('known', 'unknown')),
   last_reviewed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

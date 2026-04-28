@@ -16,7 +16,7 @@ test("mobile user memorizes a daily expression, marks unknown, and adds a questi
 
   await page.getByRole("link", { name: /^표현$/ }).click();
   await expect(page).toHaveURL(/\/expressions$/);
-  await page.getByRole("link", { name: /2026-04-27/ }).click();
+  await page.getByRole("link", { name: /The birth rate in Korea is decreasing/ }).click();
   await expect(page.getByText("The birth rate in Korea is decreasing.")).toBeVisible();
   await expect(page.getByText("한국의 출산율이 감소하고 있어요.")).toBeVisible();
 
@@ -24,9 +24,9 @@ test("mobile user memorizes a daily expression, marks unknown, and adds a questi
   await expect(page.getByText("한국의 출산율이 감소하고 있어요.")).toBeVisible();
   await expect(page.getByText("The birth rate in Korea is decreasing.")).toHaveCount(0);
 
-  await page.getByRole("button", { name: /영어 보기/ }).click();
+  await page.getByRole("button", { name: /정답 보기/ }).click();
   await expect(page.getByText("The birth rate in Korea is decreasing.")).toBeVisible();
-  await expect(page.getByText(/decrease|감소/)).toBeVisible();
+  await expect(page.getByText(/decrease는 '감소하다'/)).toBeVisible();
   await page.getByRole("button", { name: /모름/ }).click();
 
   await page.getByRole("link", { name: /^질문거리$/ }).click();
@@ -35,5 +35,5 @@ test("mobile user memorizes a daily expression, marks unknown, and adds a questi
   await expect(page.getByText("decrease와 reduce 차이를 수업 때 물어보기")).toBeVisible();
 
   await page.getByRole("button", { name: /물어봄/ }).click();
-  await expect(page.getByRole("button", { name: /다시 열기/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /다시 질문 예정/ })).toBeVisible();
 });

@@ -11,7 +11,15 @@ const eslintConfig = [
   js.configs.recommended,
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: [".next/**", "node_modules/**", "coverage/**", "playwright-report/**", "test-results/**"]
+    ignores: [
+      ".next/**",
+      "**/.next/**",
+      ".omx/**",
+      "node_modules/**",
+      "coverage/**",
+      "playwright-report/**",
+      "test-results/**"
+    ]
   },
   {
     rules: {

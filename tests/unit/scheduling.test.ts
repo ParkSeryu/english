@@ -17,6 +17,8 @@ function card(overrides: Partial<ExpressionCard>): ExpressionCard {
     source_order: 0,
     known_count: 0,
     unknown_count: 0,
+    review_count: 0,
+    last_result: null,
     last_reviewed_at: null,
     created_at: "2026-04-28T00:00:00.000Z",
     updated_at: "2026-04-28T00:00:00.000Z",

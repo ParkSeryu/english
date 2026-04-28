@@ -1,6 +1,6 @@
-# English Review App MVP
+# English Daily Expression Memorization MVP
 
-Mobile-first review app for English academy material. The revised MVP is review-first: the user tells an LLM what they learned, reviews and revises the structured draft in chat, explicitly approves saving, and then studies the saved lessons in the app.
+Mobile-first app for memorizing English sentences learned in class. The user gives an LLM a daily block such as `오늘의 영어표현 (20260427)` with English sentences and Korean meanings, reviews/revises the structured draft in chat, explicitly approves saving, and then studies the saved expressions in the app.
 
 ## Stack and hosting decision
 
@@ -10,27 +10,31 @@ Mobile-first review app for English academy material. The revised MVP is review-
 - Token-protected LLM ingestion route for draft/revise/approve writes
 - Vercel Hobby + Supabase Free for a personal/non-commercial MVP, within free-tier usage caps
 
-Public hosted use without Supabase Auth and owner-scoped RLS is intentionally blocked by product policy. Public no-auth lesson ingestion is also intentionally blocked.
+Public hosted use without Supabase Auth and owner-scoped RLS is intentionally blocked by product policy. Public no-auth expression ingestion is also intentionally blocked.
 
 ## MVP scope
 
 Included:
 
-- Email/password Supabase Auth for the review app
-- LLM/skill-facing lesson ingestion contract
+- Email/password Supabase Auth
+- LLM/skill-facing daily expression ingestion contract
 - Draft and revision turns before app insertion
-- Explicit approval required before inserting lessons/items/examples
-- Lesson list, expression detail, user memo, and confusion note editing
-- Reveal-first active recall modes
-- New/learning/memorized/confusing status updates with `last_reviewed_at` and `review_count`
-- Confusing-only revisit route and confusing-first queue scheduling
-- Mobile-first layout with a 390 x 844 smoke target
+- Explicit approval required before inserting expression days/cards/examples
+- Expression day list, expression detail, and user memo editing
+- Korean-first memorization: Korean prompt visible, English hidden until reveal
+- `맞췄음` / `모름` review actions with `known_count`, `unknown_count`, `review_count`, and `last_result`
+- Unknown-count-weighted queue scheduling so repeated `모름` appears earlier
+- Bottom GNB with `표현`, `암기`, `질문거리`
+- Quick question notes for class ideation: add, mark asked, reopen
+- Mobile-first layout with a 390 × 844 smoke target
 
 Excluded from MVP:
 
 - Heavy in-app lesson input as the primary data path
 - Full AI tutor chat inside the app
-- Exam timers, rankings, or advanced scoring
+- Full grammar notebook, tags, search, calendar, or long note system
+- Exam timers, rankings, streaks, or advanced scoring
+- Complex SRS/SM-2 scheduling
 - Voice/pronunciation features excluded from MVP
 
 ## Local setup
@@ -47,7 +51,7 @@ Create a Supabase project, enable email/password Auth, then apply all migrations
 
 ## LLM ingestion safety
 
-The ingestion route stores draft/revision payloads in `ingestion_runs`; it does not create reviewable `lessons` or `study_items` until the approval endpoint receives an explicit save phrase such as `저장해`, `앱에 넣어줘`, or `이대로 추가해`.
+The ingestion route stores draft/revision payloads in `ingestion_runs`; it does not create reviewable `expression_days` or `expressions` until the approval endpoint receives an explicit save phrase such as `저장해`, `앱에 넣어줘`, or `이대로 추가해`.
 
 Do not expose `SUPABASE_SERVICE_ROLE_KEY` to the browser. The protected ingestion route must use `INGESTION_API_TOKEN` and assign `owner_id` from server-only `INGESTION_OWNER_ID`, never from client-provided JSON.
 

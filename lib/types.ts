@@ -38,6 +38,8 @@ export type ExpressionCard = {
   source_order: number;
   known_count: number;
   unknown_count: number;
+  review_count: number;
+  last_result: "known" | "unknown" | null;
   last_reviewed_at: string | null;
   created_at: string;
   updated_at: string;
