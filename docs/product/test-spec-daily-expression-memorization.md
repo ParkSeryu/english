@@ -29,7 +29,7 @@ Implementation is complete only when:
 | Approval gate | Unit/integration/security | Non-approval feedback does not insert; explicit approval inserts one expression day. |
 | Store insertion | Integration | Expression day and expressions are inserted together as shared content; per-user progress starts empty. |
 | Memorization reveal | Component/e2e | Korean is visible before reveal; English hidden until `정답 보기`. |
-| Review result counters | Integration | `모름` increments current user `unknown_count`; `맞췄음` increments current user `known_count`; both update that user `review_count`. |
+| Review result state | Integration | `모름` sets the current user's expression state to unknown (`unknown_count: 1`, `known_count: 0`) without stacking repeated taps; `맞췄음` sets it to known (`known_count: 1`, `unknown_count: 0`); both update that user `review_count`. |
 | Queue priority | Unit/integration | Higher unknown count appears before lower unknown/known-heavy items; never-reviewed items remain visible. |
 | Grammar point | Component/e2e | Point displays after reveal/detail but is not the primary prompt. |
 | Question notes | Integration/e2e | Add question, list open first, mark asked, reopen. |
@@ -59,9 +59,9 @@ Implementation is complete only when:
 
 ### AC-004 — Unknown-weighted queue improves memorization
 
-- `모름` increases the current user `unknown_count` in `expression_progress`.
+- `모름` sets the current user `unknown_count` to 1 and `known_count` to 0 in `expression_progress`; repeated taps do not stack beyond 1.
 - Higher `unknown_count` cards rank ahead of lower-priority cards.
-- `맞췄음` increases the current user `known_count` and does not increase unknown priority.
+- `맞췄음` sets the current user `known_count` to 1 and `unknown_count` to 0, removing unknown priority.
 - Recently unknown cards do not have to appear immediately next, but remain high priority.
 
 ### AC-005 — Question ideation is quick

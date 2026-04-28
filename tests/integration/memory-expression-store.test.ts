@@ -101,7 +101,7 @@ describe("MemoryExpressionStore daily expression behavior", () => {
     expect(approved.expressionUrls[0]).toMatch(/^\/expressions\//);
   });
 
-  it("records known/unknown counters and prioritizes unknown-heavy queue items", async () => {
+  it("records current known/unknown state without stacking repeated taps and prioritizes unknown items", async () => {
     const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
     const store = new MemoryExpressionStore(userA);
     const { expressionDay } = await store.approveDraft((await store.createDraft(payload)).id, "저장해");
@@ -109,11 +109,17 @@ describe("MemoryExpressionStore daily expression behavior", () => {
     const unknown = await store.recordReviewResult(expressionDay.expressions[1].id, "unknown");
     expect(unknown).toMatchObject({ unknown_count: 1, known_count: 0, review_count: 1, last_result: "unknown" });
 
+    const repeatedUnknown = await store.recordReviewResult(expressionDay.expressions[1].id, "unknown");
+    expect(repeatedUnknown).toMatchObject({ unknown_count: 1, known_count: 0, review_count: 2, last_result: "unknown" });
+
     const known = await store.recordReviewResult(expressionDay.expressions[0].id, "known");
     expect(known).toMatchObject({ unknown_count: 0, known_count: 1, review_count: 1, last_result: "known" });
 
     const queue = await store.getMemorizationQueue();
     expect(queue[0].id).toBe(unknown.id);
+
+    const switchedKnown = await store.recordReviewResult(expressionDay.expressions[1].id, "known");
+    expect(switchedKnown).toMatchObject({ unknown_count: 0, known_count: 1, review_count: 3, last_result: "known" });
   });
 
   it("shares expression content while keeping progress, memos, and question notes per user", async () => {

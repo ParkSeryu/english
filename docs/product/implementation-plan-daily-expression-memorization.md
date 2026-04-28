@@ -127,7 +127,7 @@ Owns database shape, domain types, validation, queue logic, ingestion persistenc
   - record review result,
   - create/list/update question notes,
   - create/revise/approve ingestion drafts.
-- Ensure review updates increment `review_count`, update `last_reviewed_at`, set `last_result`, and increment only the matching known/unknown counter.
+- Ensure review updates increment `review_count`, update `last_reviewed_at`, set `last_result`, and set the matching known/unknown state to 1 while clearing the opposite state so repeated taps do not stack.
 - Ensure memory-store behavior mirrors Supabase behavior closely enough for unit, integration, and e2e tests.
 
 #### UI Lane
@@ -163,7 +163,7 @@ Before final integration, verify all of the following against the PRD and test s
 - [x] Explicit approval inserts exactly one expression day with its expressions for the configured owner.
 - [x] Non-approval Korean feedback such as `좋네`, `괜찮아`, or `이 문장 자연스러워?` does not insert.
 - [x] Memorization starts Korean-first and hides English until reveal.
-- [x] `모름` increments `unknown_count`; `맞췄음` increments `known_count`; both increment `review_count`.
+- [x] `모름` marks the expression as currently unknown (`unknown_count: 1`, `known_count: 0`) without repeated-tap stacking; `맞췄음` marks it known (`known_count: 1`, `unknown_count: 0`); both increment `review_count`.
 - [x] Queue ordering visibly favors higher `unknown_count` without immediately requiring complex SRS.
 - [x] Questions bottom tab supports quick add, asked, reopen, and open-first sorting.
 - [x] RLS denies anon access, allows shared expression reads to authenticated users, and keeps progress/questions user-scoped.

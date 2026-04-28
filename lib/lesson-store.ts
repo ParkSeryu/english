@@ -225,8 +225,8 @@ class SupabaseExpressionStore implements ExpressionStore {
           user_id: this.user.id,
           expression_id: id,
           user_memo: current.user_memo ?? null,
-          known_count: current.known_count + (result === "known" ? 1 : 0),
-          unknown_count: current.unknown_count + (result === "unknown" ? 1 : 0),
+          known_count: result === "known" ? 1 : 0,
+          unknown_count: result === "unknown" ? 1 : 0,
           review_count: current.review_count + 1,
           last_result: result,
           last_reviewed_at: timestamp,
@@ -472,8 +472,8 @@ export class MemoryExpressionStore implements ExpressionStore {
       progress = defaultProgress(this.user.id, id, timestamp);
       memoryState().expressionProgress.push(progress);
     }
-    if (result === "known") progress.known_count += 1;
-    else progress.unknown_count += 1;
+    progress.known_count = result === "known" ? 1 : 0;
+    progress.unknown_count = result === "unknown" ? 1 : 0;
     progress.review_count += 1;
     progress.last_result = result;
     progress.last_reviewed_at = timestamp;

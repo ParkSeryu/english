@@ -81,8 +81,8 @@ Each expression card supports:
 - After reveal, user chooses:
   - `맞췄음`
   - `모름`
-- `모름` increments the current learner's `unknown_count` and makes the card appear more frequently for that learner.
-- `맞췄음` increments the current learner's `known_count` and lowers priority for that learner.
+- `모름` marks the current learner's state as unknown (`unknown_count: 1`, `known_count: 0`) and makes the card appear more frequently for that learner; repeated taps on the same expression do not stack beyond 1.
+- `맞췄음` marks the current learner's state as known (`known_count: 1`, `unknown_count: 0`) and lowers priority for that learner.
 
 ### MVP review scheduling
 
@@ -90,7 +90,7 @@ MVP should use a simple, understandable heuristic instead of a full SRS engine:
 
 1. Higher `unknown_count` first.
 2. Never-reviewed cards stay near the front.
-3. Cards with repeated `맞췄음` move later.
+3. Cards marked known move later.
 4. Tie-break by least recently reviewed, then original order.
 
 A short cooldown can be added later if immediate repeats become annoying, but it is intentionally excluded from this MVP implementation.
@@ -251,8 +251,8 @@ Reuse or adapt the existing ingestion run concept, but `normalized_payload` shou
 2. No expression day is saved before explicit approval.
 3. The app shows date-based expression days.
 4. Memorization shows Korean first and hides English before reveal.
-5. `모름` increments `unknown_count` and increases future queue priority.
-6. `맞췄음` increments `known_count` and decreases priority relative to unknown-heavy cards.
+5. `모름` marks `unknown_count` as 1 without repeated-tap stacking and increases future queue priority.
+6. `맞췄음` marks `known_count` as 1, clears unknown priority, and decreases priority relative to unknown cards.
 7. Grammar points display as hints/support after reveal or detail.
 8. Questions tab lets the user add and mark class questions.
 9. Supabase RLS lets authenticated users read shared expression content while keeping `expression_progress`, `question_notes`, and `ingestion_runs` scoped to their owner/user.
