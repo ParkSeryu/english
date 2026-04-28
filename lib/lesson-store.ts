@@ -15,6 +15,7 @@ import type {
   ExpressionDaySummary,
   ExpressionExample,
   ExpressionIngestionPayload,
+  ExpressionProgress,
   IngestionRun,
   QuestionNote,
   QuestionNoteInput,
@@ -86,6 +87,33 @@ function requireEntity<T>(entity: T | null | undefined, message: string): T {
   return entity;
 }
 
+function defaultProgress(userId: string, expressionId: string, timestamp = nowIso()): ExpressionProgress {
+  return {
+    user_id: userId,
+    expression_id: expressionId,
+    user_memo: null,
+    known_count: 0,
+    unknown_count: 0,
+    review_count: 0,
+    last_result: null,
+    last_reviewed_at: null,
+    created_at: timestamp,
+    updated_at: timestamp
+  };
+}
+
+function applyProgress(card: ExpressionCard, progress?: Partial<ExpressionProgress> | null): ExpressionCard {
+  return {
+    ...card,
+    user_memo: progress?.user_memo ?? null,
+    known_count: progress?.known_count ?? 0,
+    unknown_count: progress?.unknown_count ?? 0,
+    review_count: progress?.review_count ?? 0,
+    last_result: progress?.last_result ?? null,
+    last_reviewed_at: progress?.last_reviewed_at ?? null
+  };
+}
+
 function expressionUrl(card: ExpressionCard) {
   return `/expressions/${card.id}`;
 }
@@ -100,16 +128,44 @@ class SupabaseExpressionStore implements ExpressionStore {
     return this.createClient();
   }
 
+  private async progressFor(expressionIds: string[]) {
+    if (expressionIds.length === 0) return new Map<string, ExpressionProgress>();
+    const { data, error } = await (await this.supabase())
+      .from("expression_progress")
+      .select("*")
+      .eq("user_id", this.user.id)
+      .in("expression_id", expressionIds);
+    if (error) throw error;
+    return new Map((data ?? []).map((row: ExpressionProgress) => [row.expression_id, row]));
+  }
+
+  private async progressForOne(expressionId: string) {
+    const { data, error } = await (await this.supabase())
+      .from("expression_progress")
+      .select("*")
+      .eq("user_id", this.user.id)
+      .eq("expression_id", expressionId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as ExpressionProgress | null) ?? null;
+  }
+
+  private async applyUserProgress(cards: ExpressionCard[]) {
+    const progress = await this.progressFor(cards.map((card) => card.id));
+    return cards.map((card) => applyProgress(card, progress.get(card.id)));
+  }
+
   async listExpressionDays() {
     const supabase = await this.supabase();
     const { data, error } = await supabase
       .from("expression_days")
       .select("*, expressions(*, expression_examples(*))")
-      .eq("owner_id", this.user.id)
       .order("day_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data ?? []).map((row: SupabaseExpressionDayRow) => normalizeExpressionDay(row));
+    const days = (data ?? []).map((row: SupabaseExpressionDayRow) => normalizeExpressionDay(row));
+    const progress = await this.progressFor(days.flatMap((day) => day.expressions.map((card) => card.id)));
+    return days.map((day) => ({ ...day, expressions: day.expressions.map((card) => applyProgress(card, progress.get(card.id))) }));
   }
 
   async getExpressionDay(id: string) {
@@ -118,10 +174,12 @@ class SupabaseExpressionStore implements ExpressionStore {
       .from("expression_days")
       .select("*, expressions(*, expression_examples(*))")
       .eq("id", id)
-      .eq("owner_id", this.user.id)
       .maybeSingle();
     if (error) throw error;
-    return data ? normalizeExpressionDay(data as SupabaseExpressionDayRow) : null;
+    if (!data) return null;
+    const day = normalizeExpressionDay(data as SupabaseExpressionDayRow);
+    const progress = await this.progressFor(day.expressions.map((card) => card.id));
+    return { ...day, expressions: day.expressions.map((card) => applyProgress(card, progress.get(card.id))) };
   }
 
   async getExpression(id: string) {
@@ -130,10 +188,11 @@ class SupabaseExpressionStore implements ExpressionStore {
       .from("expressions")
       .select("*, expression_examples(*), expression_days(id,title,source_note,day_date)")
       .eq("id", id)
-      .eq("owner_id", this.user.id)
       .maybeSingle();
     if (error) throw error;
-    return data ? normalizeExpression(data as SupabaseExpressionRow) : null;
+    if (!data) return null;
+    const card = normalizeExpression(data as SupabaseExpressionRow);
+    return applyProgress(card, await this.progressForOne(card.id));
   }
 
   private async listExpressions() {
@@ -141,10 +200,9 @@ class SupabaseExpressionStore implements ExpressionStore {
     const { data, error } = await supabase
       .from("expressions")
       .select("*, expression_examples(*), expression_days(id,title,source_note,day_date)")
-      .eq("owner_id", this.user.id)
       .order("source_order", { ascending: true });
     if (error) throw error;
-    return (data ?? []).map((row: SupabaseExpressionRow) => normalizeExpression(row));
+    return this.applyUserProgress((data ?? []).map((row: SupabaseExpressionRow) => normalizeExpression(row)));
   }
 
   async getMemorizationQueue(options: { limit?: number } = {}) {
@@ -158,30 +216,48 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   async recordReviewResult(id: string, result: "known" | "unknown") {
     const existing = requireEntity(await this.getExpression(id), "Expression not found");
+    const current = (await this.progressForOne(id)) ?? defaultProgress(this.user.id, id, existing.created_at);
     const timestamp = nowIso();
     const { error } = await (await this.supabase())
-      .from("expressions")
-      .update({
-        known_count: existing.known_count + (result === "known" ? 1 : 0),
-        unknown_count: existing.unknown_count + (result === "unknown" ? 1 : 0),
-        review_count: existing.review_count + 1,
-        last_result: result,
-        last_reviewed_at: timestamp,
-        updated_at: timestamp
-      })
-      .eq("id", id)
-      .eq("owner_id", this.user.id);
+      .from("expression_progress")
+      .upsert(
+        {
+          user_id: this.user.id,
+          expression_id: id,
+          user_memo: current.user_memo ?? null,
+          known_count: current.known_count + (result === "known" ? 1 : 0),
+          unknown_count: current.unknown_count + (result === "unknown" ? 1 : 0),
+          review_count: current.review_count + 1,
+          last_result: result,
+          last_reviewed_at: timestamp,
+          updated_at: timestamp
+        },
+        { onConflict: "user_id,expression_id" }
+      );
     if (error) throw error;
     return requireEntity(await this.getExpression(id), "Expression not found");
   }
 
   async updateExpressionMemo(id: string, input: CardMemoInput) {
+    const existing = requireEntity(await this.getExpression(id), "Expression not found");
+    const current = (await this.progressForOne(id)) ?? defaultProgress(this.user.id, id, existing.created_at);
     const timestamp = nowIso();
     const { error } = await (await this.supabase())
-      .from("expressions")
-      .update({ user_memo: input.userMemo || null, updated_at: timestamp })
-      .eq("id", id)
-      .eq("owner_id", this.user.id);
+      .from("expression_progress")
+      .upsert(
+        {
+          user_id: this.user.id,
+          expression_id: id,
+          user_memo: input.userMemo || null,
+          known_count: current.known_count,
+          unknown_count: current.unknown_count,
+          review_count: current.review_count,
+          last_result: current.last_result,
+          last_reviewed_at: current.last_reviewed_at,
+          updated_at: timestamp
+        },
+        { onConflict: "user_id,expression_id" }
+      );
     if (error) throw error;
     return requireEntity(await this.getExpression(id), "Expression not found");
   }
@@ -278,7 +354,7 @@ class SupabaseExpressionStore implements ExpressionStore {
         nuance_note: card.nuance_note ?? null,
         structure_note: card.structure_note ?? null,
         grammar_note: card.grammar_note ?? null,
-        user_memo: card.user_memo ?? null,
+        user_memo: null,
           source_order: index,
           updated_at: timestamp
       }));
@@ -322,16 +398,16 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 }
 
-type MemoryState = { expressionDays: ExpressionDay[]; ingestionRuns: IngestionRun[]; questionNotes: QuestionNote[] };
+type MemoryState = { expressionDays: ExpressionDay[]; expressionProgress: ExpressionProgress[]; ingestionRuns: IngestionRun[]; questionNotes: QuestionNote[] };
 const globalMemory = globalThis as typeof globalThis & { __englishExpressionMemoryStore?: MemoryState };
 
 export function resetMemoryLessonStoreForTests() {
-  globalMemory.__englishExpressionMemoryStore = { expressionDays: [], ingestionRuns: [], questionNotes: [] };
+  globalMemory.__englishExpressionMemoryStore = { expressionDays: [], expressionProgress: [], ingestionRuns: [], questionNotes: [] };
 }
 export const resetMemoryExpressionStoreForTests = resetMemoryLessonStoreForTests;
 
 function memoryState() {
-  globalMemory.__englishExpressionMemoryStore ??= { expressionDays: [], ingestionRuns: [], questionNotes: [] };
+  globalMemory.__englishExpressionMemoryStore ??= { expressionDays: [], expressionProgress: [], ingestionRuns: [], questionNotes: [] };
   return globalMemory.__englishExpressionMemoryStore;
 }
 
@@ -348,19 +424,30 @@ function cloneRun(run: IngestionRun): IngestionRun {
 export class MemoryExpressionStore implements ExpressionStore {
   constructor(private readonly user: UserIdentity) {}
 
+  private progressForExpression(expressionId: string) {
+    return memoryState().expressionProgress.find((progress) => progress.user_id === this.user.id && progress.expression_id === expressionId) ?? null;
+  }
+
+  private cardWithProgress(card: ExpressionCard) {
+    return applyProgress(card, this.progressForExpression(card.id));
+  }
+
   async listExpressionDays() {
-    return memoryState().expressionDays.filter((day) => day.owner_id === this.user.id).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).map(cloneExpressionDay);
+    return memoryState().expressionDays.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).map((day) => ({
+      ...cloneExpressionDay(day),
+      expressions: day.expressions.map((card) => cloneExpression(this.cardWithProgress(card)))
+    }));
   }
 
   async getExpressionDay(id: string) {
-    const day = memoryState().expressionDays.find((item) => item.id === id && item.owner_id === this.user.id);
-    return day ? cloneExpressionDay(day) : null;
+    const day = memoryState().expressionDays.find((item) => item.id === id);
+    return day ? { ...cloneExpressionDay(day), expressions: day.expressions.map((card) => cloneExpression(this.cardWithProgress(card))) } : null;
   }
 
   async getExpression(id: string) {
     const located = this.findMutableExpression(id);
     if (!located) return null;
-    return cloneExpression({ ...located.card, day: toDaySummary(located.day) });
+    return cloneExpression({ ...this.cardWithProgress(located.card), day: toDaySummary(located.day) });
   }
 
   private async listExpressions() {
@@ -380,13 +467,17 @@ export class MemoryExpressionStore implements ExpressionStore {
     const located = this.findMutableExpression(id);
     if (!located) throw new Error("Expression not found");
     const timestamp = nowIso();
-    if (result === "known") located.card.known_count += 1;
-    else located.card.unknown_count += 1;
-    located.card.review_count += 1;
-    located.card.last_result = result;
-    located.card.last_reviewed_at = timestamp;
-    located.card.updated_at = timestamp;
-    located.day.updated_at = timestamp;
+    let progress = this.progressForExpression(id);
+    if (!progress) {
+      progress = defaultProgress(this.user.id, id, timestamp);
+      memoryState().expressionProgress.push(progress);
+    }
+    if (result === "known") progress.known_count += 1;
+    else progress.unknown_count += 1;
+    progress.review_count += 1;
+    progress.last_result = result;
+    progress.last_reviewed_at = timestamp;
+    progress.updated_at = timestamp;
     return requireEntity(await this.getExpression(id), "Expression not found");
   }
 
@@ -394,9 +485,13 @@ export class MemoryExpressionStore implements ExpressionStore {
     const located = this.findMutableExpression(id);
     if (!located) throw new Error("Expression not found");
     const timestamp = nowIso();
-    located.card.user_memo = input.userMemo || null;
-    located.card.updated_at = timestamp;
-    located.day.updated_at = timestamp;
+    let progress = this.progressForExpression(id);
+    if (!progress) {
+      progress = defaultProgress(this.user.id, id, timestamp);
+      memoryState().expressionProgress.push(progress);
+    }
+    progress.user_memo = input.userMemo || null;
+    progress.updated_at = timestamp;
     return requireEntity(await this.getExpression(id), "Expression not found");
   }
 
@@ -474,7 +569,7 @@ export class MemoryExpressionStore implements ExpressionStore {
           nuance_note: cardInput.nuance_note ?? null,
           structure_note: cardInput.structure_note ?? null,
           grammar_note: cardInput.grammar_note ?? null,
-          user_memo: cardInput.user_memo ?? null,
+          user_memo: null,
           source_order: index,
           known_count: 0,
           unknown_count: 0,
@@ -514,7 +609,6 @@ export class MemoryExpressionStore implements ExpressionStore {
 
   private findMutableExpression(id: string) {
     for (const day of memoryState().expressionDays) {
-      if (day.owner_id !== this.user.id) continue;
       const card = day.expressions.find((candidate) => candidate.id === id);
       if (card) return { day, card };
     }

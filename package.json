@@ -2,7 +2,7 @@
   "name": "english-review-app",
   "version": "0.1.0",
   "private": true,
-  "description": "Mobile-first English conversation review MVP with Supabase Auth and owner-scoped RLS.",
+  "description": "Mobile-first English expression memorization MVP with shared content and per-user progress.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

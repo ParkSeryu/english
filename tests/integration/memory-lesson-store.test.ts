@@ -48,17 +48,23 @@ describe("MemoryExpressionStore integration behavior", () => {
     expect(queue[0].id).toBe(expression.id);
   });
 
-  it("keeps expression days, expressions, and questions owner-scoped", async () => {
+  it("shares expression content but keeps questions and expression progress user-scoped", async () => {
     const storeA = new MemoryExpressionStore(userA);
     const draft = await storeA.createDraft(payload);
     const approved = await storeA.approveDraft(draft.id, "저장해");
+    const expressionId = approved.expressionDay.expressions[0].id;
+    await storeA.recordReviewResult(expressionId, "unknown");
+    await storeA.updateExpressionMemo(expressionId, { userMemo: "A private memo" });
     await storeA.createQuestionNote({ questionText: "owner only?" });
+
     const otherStore = new MemoryExpressionStore(userB);
 
-    expect(await otherStore.getExpressionDay(approved.expressionDay.id)).toBeNull();
-    expect(await otherStore.getExpression(approved.expressionDay.expressions[0].id)).toBeNull();
-    expect(await otherStore.listExpressionDays()).toEqual([]);
+    expect(await otherStore.getExpressionDay(approved.expressionDay.id)).toMatchObject({ id: approved.expressionDay.id });
+    expect(await otherStore.listExpressionDays()).toHaveLength(1);
+    expect(await otherStore.getExpression(expressionId)).toMatchObject({ unknown_count: 0, known_count: 0, review_count: 0, user_memo: null });
+    await otherStore.updateExpressionMemo(expressionId, { userMemo: "B private memo" });
+    expect(await storeA.getExpression(expressionId)).toMatchObject({ unknown_count: 1, user_memo: "A private memo" });
+    expect(await otherStore.getExpression(expressionId)).toMatchObject({ unknown_count: 0, user_memo: "B private memo" });
     expect(await otherStore.listQuestionNotes()).toEqual([]);
-    await expect(otherStore.updateExpressionMemo(approved.expressionDay.expressions[0].id, { userMemo: "hack" })).rejects.toThrow("Expression not found");
   });
 });

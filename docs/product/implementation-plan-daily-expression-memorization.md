@@ -54,10 +54,11 @@ Rebuild the current lesson-oriented app into a daily expression memorization app
 
 ### Phase 3 — Database and RLS
 
-- Add migration for:
-  - `expression_days`
-  - `expressions`
-  - `question_notes`
+- Add migrations for:
+  - shared `expression_days`
+  - shared `expressions` / `expression_examples`
+  - per-user `expression_progress`
+  - per-user `question_notes`
 - Update local RLS verifier and static RLS tests.
 - Keep `ingestion_runs` owner-scoped.
 - Do not rely on old lesson tables for the new app path.
@@ -79,10 +80,10 @@ Rebuild the current lesson-oriented app into a daily expression memorization app
 ### Phase 5 — Tests and verification
 
 - Unit: validation/date parsing/scheduling/approval.
-- Integration: memory store insertion, review counters, question notes, owner scope.
+- Integration: memory store insertion, shared content visibility, per-user review counters/memos, question notes.
 - Component: memorize card hides English before reveal.
 - E2E: seeded expression day → memorize → mark unknown → add question.
-- RLS: anon denied, owner allowed, cross-owner denied for new tables.
+- RLS: anon denied; authenticated users can read shared expression content; cross-user progress/questions denied.
 
 
 ## Worker 3 Review Addendum — Documentation and Code Quality
@@ -165,7 +166,7 @@ Before final integration, verify all of the following against the PRD and test s
 - [x] `모름` increments `unknown_count`; `맞췄음` increments `known_count`; both increment `review_count`.
 - [x] Queue ordering visibly favors higher `unknown_count` without immediately requiring complex SRS.
 - [x] Questions bottom tab supports quick add, asked, reopen, and open-first sorting.
-- [x] RLS denies anon/cross-owner access and allows owner-scoped access for new tables.
+- [x] RLS denies anon access, allows shared expression reads to authenticated users, and keeps progress/questions user-scoped.
 - [x] No voice/pronunciation, speech recognition, gamification, or complex SRS scope was added.
 
 ## Team Work Allocation
@@ -187,7 +188,7 @@ Integration owner responsibilities:
 ## Launch Hint
 
 ```text
-$team 3:executor "Implement docs/product/implementation-plan-daily-expression-memorization.md. Split lanes into schema/store, UI, and tests. Preserve approval-gated LLM ingestion, owner-scoped RLS, Korean-first memorization, unknown-weighted queue, and Questions GNB tab."
+$team 3:executor "Implement docs/product/implementation-plan-daily-expression-memorization.md. Split lanes into schema/store, UI, and tests. Preserve approval-gated LLM ingestion, shared expression content, per-user progress RLS, Korean-first memorization, unknown-weighted queue, and Questions GNB tab."
 ```
 
 ## Risks

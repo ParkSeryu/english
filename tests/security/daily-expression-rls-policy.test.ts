@@ -17,16 +17,16 @@ function canOwnerRow(operation: Operation, actorId: string | null, rowOwnerId: s
   return rowOwnerId === actorId;
 }
 
-function canChildThroughOwnedParent(actorId: string | null, parentOwnerId: string) {
-  return Boolean(actorId && actorId === parentOwnerId);
+function canReadSharedExpressionContent(actorId: string | null) {
+  return Boolean(actorId);
 }
 
 describe("daily expression Supabase RLS migration", () => {
-  it.each(["expression_days", "expressions", "expression_examples", "question_notes", "ingestion_runs"])("enables RLS for %s", (table) => {
+  it.each(["expression_days", "expressions", "expression_examples", "expression_progress", "question_notes", "ingestion_runs"])("enables RLS for %s", (table) => {
     expect(migration).toContain(`alter table public.${table} enable row level security`);
   });
 
-  it.each(["expression_days", "question_notes", "ingestion_runs"])("defines direct owner policies for %s", (table) => {
+  it.each(["expression_progress", "question_notes", "ingestion_runs"])("defines direct owner policies for %s", (table) => {
     for (const operation of ["select", "insert", "update", "delete"] as const) {
       expect(migration).toContain(`create policy "${table}_${operation}_own"`);
       expect(migration).toContain(`on public.${table}`);
@@ -34,19 +34,17 @@ describe("daily expression Supabase RLS migration", () => {
     expect(migration).toContain("owner_id = auth.uid()");
   });
 
-  it("defines expressions owner and parent-day policies", () => {
-    expect(migration).toContain('create policy "expressions_select_own"');
-    expect(migration).toContain('create policy "expressions_insert_owned_day"');
-    expect(migration).toContain('create policy "expressions_update_own"');
-    expect(migration).toContain('create policy "expressions_delete_own"');
-    expect(migration).toContain("expression_days.id = expressions.expression_day_id");
-    expect(migration).toContain("expression_days.owner_id = auth.uid()");
+  it("defines shared read policies for expression content", () => {
+    expect(migration).toContain('create policy "expression_days_select_shared"');
+    expect(migration).toContain('create policy "expressions_select_shared"');
+    expect(migration).toContain('create policy "expression_examples_select_shared_expression"');
+    expect(migration).toContain("auth.uid() is not null");
   });
 
-  it.each(["select", "insert", "update", "delete"] as const)("defines expression_examples %s parent-expression policy", (operation) => {
-    expect(migration).toContain(`expression_examples_${operation}_owned_expression`);
-    expect(migration).toContain("expressions.id = expression_examples.expression_id");
-    expect(migration).toContain("expressions.owner_id = auth.uid()");
+  it("removes authenticated write policies from shared expression content", () => {
+    expect(migration).toContain('drop policy if exists "expression_days_insert_own"');
+    expect(migration).toContain('drop policy if exists "expressions_insert_owned_day"');
+    expect(migration).toContain('drop policy if exists "expression_examples_insert_owned_expression"');
   });
 
   it("models unauthenticated and cross-owner denial for direct owner tables", () => {
@@ -56,9 +54,9 @@ describe("daily expression Supabase RLS migration", () => {
     expect(canOwnerRow("delete", "user-a", "user-b")).toBe(false);
   });
 
-  it("models expressions access only through the owned parent day", () => {
-    expect(canChildThroughOwnedParent(null, "user-a")).toBe(false);
-    expect(canChildThroughOwnedParent("user-a", "user-a")).toBe(true);
-    expect(canChildThroughOwnedParent("user-a", "user-b")).toBe(false);
+  it("models shared content reads for any authenticated user", () => {
+    expect(canReadSharedExpressionContent(null)).toBe(false);
+    expect(canReadSharedExpressionContent("user-a")).toBe(true);
+    expect(canReadSharedExpressionContent("user-b")).toBe(true);
   });
 });

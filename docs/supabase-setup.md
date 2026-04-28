@@ -23,7 +23,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
    - `study_examples`
    - `study_cards`
    - `card_examples`
-8. Confirm policies only allow authenticated users to manage rows they own. Locally, run `npm run verify:rls` if Docker is available.
+8. Confirm policies allow authenticated users to read shared expression content while managing only their own progress/questions. Locally, run `npm run verify:rls` if Docker is available.
 
 ## Minimum env for login and app usage
 
@@ -34,7 +34,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
 ```
 
-With only those two variables configured, users can sign up, log in, log out, and use already-saved owner-scoped data. The app intentionally redirects unauthenticated users away from persisted study screens.
+With only those two variables configured, users can sign up, log in, log out, read already-saved shared expression content, and maintain their own progress/questions. The app intentionally redirects unauthenticated users away from persisted study screens.
 
 ## Codex/assistant ingestion server secrets
 

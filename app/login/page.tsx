@@ -16,7 +16,7 @@ export default async function LoginPage() {
         <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-700">Supabase 로그인</p>
         <h1 className="mt-2 text-3xl font-black text-ink">복습하려면 먼저 로그인하세요</h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          The MVP uses owner-scoped rows and RLS. Do not deploy this app publicly without configured Supabase 로그인 and migrations.
+          The MVP uses Supabase 로그인, shared expression content, and per-user RLS for progress/questions. Do not deploy publicly without configured migrations.
         </p>
       </div>
       {!hasSupabaseEnv() ? (

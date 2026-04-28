@@ -28,14 +28,17 @@ export type ExpressionExample = {
 export type ExpressionCard = {
   id: string;
   expression_day_id: string;
+  /** Creator/import owner for audit; expression content is shared with all signed-in users. */
   owner_id: string;
   english: string;
   korean_prompt: string;
   nuance_note: string | null;
   structure_note: string | null;
   grammar_note: string | null;
+  /** Current signed-in user's private memo for this shared expression. */
   user_memo: string | null;
   source_order: number;
+  /** Current signed-in user's private review counters for this shared expression. */
   known_count: number;
   unknown_count: number;
   review_count: number;
@@ -58,6 +61,19 @@ export type ExpressionDay = {
   created_at: string;
   updated_at: string;
   expressions: ExpressionCard[];
+};
+
+export type ExpressionProgress = {
+  user_id: string;
+  expression_id: string;
+  user_memo: string | null;
+  known_count: number;
+  unknown_count: number;
+  review_count: number;
+  last_result: "known" | "unknown" | null;
+  last_reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type QuestionNoteStatus = "open" | "asked";

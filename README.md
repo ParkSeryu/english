@@ -6,11 +6,11 @@ Mobile-first app for memorizing English sentences learned in class. The user giv
 
 - Next.js App Router + TypeScript + Tailwind CSS
 - Supabase Auth + Supabase Postgres persistence
-- Owner-scoped Row Level Security (RLS)
+- Shared expression content plus per-user Row Level Security (RLS) for progress/questions
 - Token-protected Codex/assistant ingestion route for draft/revise/approve writes
 - Vercel Hobby + Supabase Free for a personal/non-commercial MVP, within free-tier usage caps
 
-Public hosted use without Supabase Auth and owner-scoped RLS is intentionally blocked by product policy. Public no-auth expression ingestion is also intentionally blocked.
+Public hosted use without Supabase Auth and RLS-backed private progress/questions is intentionally blocked by product policy. Public no-auth expression ingestion is also intentionally blocked.
 
 ## MVP scope
 
@@ -20,9 +20,9 @@ Included:
 - LLM/skill-facing daily expression ingestion contract
 - Draft and revision turns before app insertion
 - Explicit approval required before inserting expression days/cards/examples
-- Expression day list, expression detail, and user memo editing
+- Shared expression day list, expression detail, and per-user memo editing
 - Korean-first memorization: Korean prompt visible, English hidden until reveal
-- `맞췄음` / `모름` review actions with `known_count`, `unknown_count`, `review_count`, and `last_result`
+- `맞췄음` / `모름` review actions with per-user `known_count`, `unknown_count`, `review_count`, and `last_result`
 - Unknown-count-weighted queue scheduling so repeated `모름` appears earlier
 - Bottom GNB with `표현`, `암기`, `질문거리`
 - Quick question notes for class ideation: add, mark asked, reopen
@@ -54,7 +54,7 @@ Create a Supabase project, enable email/password Auth, then apply all migrations
 
 The ingestion route stores draft/revision payloads in `ingestion_runs`; it does not create reviewable `expression_days` or `expressions` until the approval endpoint receives an explicit save phrase such as `저장해`, `앱에 넣어줘`, or `이대로 추가해`.
 
-Do not expose `SUPABASE_SERVICE_ROLE_KEY` to the browser. The protected ingestion route must use `INGESTION_API_TOKEN` and assign `owner_id` from server-only `INGESTION_OWNER_ID`, never from client-provided JSON.
+Do not expose `SUPABASE_SERVICE_ROLE_KEY` to the browser. The protected ingestion route must use `INGESTION_API_TOKEN` and assign audit `owner_id` from server-only `INGESTION_OWNER_ID`, never from client-provided JSON. Learner visibility is shared after approval; progress remains per user.
 
 ## Verification commands
 

@@ -27,13 +27,13 @@ Implementation is complete only when:
 | Daily expression payload | Unit | Valid `오늘의 영어표현` structured payload accepted; missing English/Korean/date rejected. |
 | Date normalization | Unit | `260427` and `20260427` normalize correctly when unambiguous. |
 | Approval gate | Unit/integration/security | Non-approval feedback does not insert; explicit approval inserts one expression day. |
-| Store insertion | Integration | Expression day and expressions are inserted together and owner-scoped. |
+| Store insertion | Integration | Expression day and expressions are inserted together as shared content; per-user progress starts empty. |
 | Memorization reveal | Component/e2e | Korean is visible before reveal; English hidden until `정답 보기`. |
-| Review result counters | Integration | `모름` increments `unknown_count`; `맞췄음` increments `known_count`; both update `review_count`. |
+| Review result counters | Integration | `모름` increments current user `unknown_count`; `맞췄음` increments current user `known_count`; both update that user `review_count`. |
 | Queue priority | Unit/integration | Higher unknown count appears before lower unknown/known-heavy items; never-reviewed items remain visible. |
 | Grammar point | Component/e2e | Point displays after reveal/detail but is not the primary prompt. |
 | Question notes | Integration/e2e | Add question, list open first, mark asked, reopen. |
-| RLS | SQL/container/security | Owner can manage own expression days/expressions/questions; cross-owner and anon denied. |
+| RLS | SQL/container/security | Authenticated users can read shared expression content; anonymous users cannot; progress/questions remain cross-user isolated. |
 | Scope safety | Static/security | No voice/pronunciation scope; no public no-auth insert endpoint. |
 
 ## Acceptance Criteria Mapping
@@ -49,7 +49,7 @@ Implementation is complete only when:
 
 - `좋네`, `괜찮아`, `이 문장 자연스러워?`, and revision requests do not insert.
 - `이대로 앱에 넣어줘`, `저장해`, or equivalent explicit approval inserts.
-- Inserted rows get server-assigned `owner_id`.
+- Inserted shared content gets server-assigned audit/import `owner_id`; this owner does not limit learner visibility.
 
 ### AC-003 — Memorization hides the answer
 
@@ -59,9 +59,9 @@ Implementation is complete only when:
 
 ### AC-004 — Unknown-weighted queue improves memorization
 
-- `모름` increases `unknown_count`.
+- `모름` increases the current user `unknown_count` in `expression_progress`.
 - Higher `unknown_count` cards rank ahead of lower-priority cards.
-- `맞췄음` increases `known_count` and does not increase unknown priority.
+- `맞췄음` increases the current user `known_count` and does not increase unknown priority.
 - Recently unknown cards do not have to appear immediately next, but remain high priority.
 
 ### AC-005 — Question ideation is quick
@@ -72,9 +72,10 @@ Implementation is complete only when:
 
 ### AC-006 — RLS/Auth safety holds
 
-- Unauthenticated users cannot access persisted data.
-- User A cannot see/mutate User B expression days, expressions, or question notes.
-- Service-role ingestion path never trusts client-provided `owner_id`.
+- Unauthenticated users cannot access persisted shared content or private state.
+- User A and User B can both read approved expression days/expressions/examples.
+- User A cannot see or mutate User B `expression_progress` or `question_notes`.
+- Service-role ingestion path never trusts client-provided `owner_id`; it uses the configured import owner only for audit/draft ownership.
 
 ## Suggested Commands
 
@@ -99,4 +100,5 @@ npm audit --audit-level=moderate
 7. Confirm it appears earlier than cards with many `맞췄음` marks.
 8. Add a class question in the Questions tab.
 9. Mark it asked and reopen it.
-10. Confirm no voice/pronunciation UI appears.
+10. Log in as a second user/test identity and confirm the same expressions are visible with zero counters and no memo.
+11. Confirm no voice/pronunciation UI appears.

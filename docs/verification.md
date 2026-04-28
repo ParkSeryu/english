@@ -7,7 +7,7 @@ Required gates from the test spec:
 - Unit/integration/component/security tests: `npm test`
 - Build: `npm run build`
 - Mobile smoke: `npm run test:e2e` at 390 x 844
-- Supabase/RLS: `npm run verify:rls` runs the migration against a disposable local Postgres container with Supabase-like roles/auth.uid() claims; static migration tests and owner-scoped data-layer tests run under `npm test`. Live hosted verification still requires configured Supabase credentials.
+- Supabase/RLS: `npm run verify:rls` runs the migration against a disposable local Postgres container with Supabase-like roles/auth.uid() claims; static migration tests and shared-content/per-user-state data-layer tests run under `npm test`. Live hosted verification still requires configured Supabase credentials.
 
 Manual QA checklist:
 

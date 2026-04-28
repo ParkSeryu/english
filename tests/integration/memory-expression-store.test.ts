@@ -39,6 +39,7 @@ type MemoryExpressionStoreInstance = {
   getExpression: (id: string) => Promise<ExpressionCard | null>;
   getMemorizationQueue: (options?: { limit?: number }) => Promise<ExpressionCard[]>;
   recordReviewResult: (id: string, result: ReviewResult) => Promise<ExpressionCard>;
+  updateExpressionMemo: (id: string, input: { userMemo: string }) => Promise<ExpressionCard>;
   createQuestionNote: (input: { questionText: string }) => Promise<QuestionNote>;
   listQuestionNotes: () => Promise<QuestionNote[]>;
   updateQuestionNote: (id: string, input: { status: QuestionStatus }) => Promise<QuestionNote>;
@@ -115,15 +116,34 @@ describe("MemoryExpressionStore daily expression behavior", () => {
     expect(queue[0].id).toBe(unknown.id);
   });
 
-  it("keeps expression days, expressions, and question notes owner-scoped", async () => {
+  it("shares expression content while keeping progress, memos, and question notes per user", async () => {
     const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
     const storeA = new MemoryExpressionStore(userA);
     const { expressionDay } = await storeA.approveDraft((await storeA.createDraft(payload)).id, "저장해");
+    const expressionId = expressionDay.expressions[0].id;
     const question = await storeA.createQuestionNote({ questionText: "decrease와 reduce 차이를 물어보기" });
 
+    await storeA.recordReviewResult(expressionId, "unknown");
+    await storeA.updateExpressionMemo(expressionId, { userMemo: "A만 보는 메모" });
+
     const storeB = new MemoryExpressionStore(userB);
-    expect(await storeB.getExpressionDay(expressionDay.id)).toBeNull();
-    expect(await storeB.getExpression(expressionDay.expressions[0].id)).toBeNull();
+    const sharedDayForB = await storeB.getExpressionDay(expressionDay.id);
+    expect(sharedDayForB).toMatchObject({ id: expressionDay.id, title: expressionDay.title });
+
+    const expressionForB = await storeB.getExpression(expressionId);
+    expect(expressionForB).toMatchObject({
+      id: expressionId,
+      english: expressionDay.expressions[0].english,
+      unknown_count: 0,
+      known_count: 0,
+      review_count: 0,
+      user_memo: null
+    });
+
+    await storeB.recordReviewResult(expressionId, "known");
+    expect(await storeA.getExpression(expressionId)).toMatchObject({ unknown_count: 1, known_count: 0, user_memo: "A만 보는 메모" });
+    expect(await storeB.getExpression(expressionId)).toMatchObject({ unknown_count: 0, known_count: 1, user_memo: null });
+
     expect(await storeB.listQuestionNotes()).toEqual([]);
     await expect(storeB.updateQuestionNote(question.id, { status: "asked" })).rejects.toThrow("Question note not found");
   });
