@@ -74,4 +74,18 @@ describe("MemorizeCard", () => {
     expect(screen.getByRole("button", { name: /맞췄음/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /모름/ })).toBeInTheDocument();
   });
+
+  it("hides the answer again after marking an expression unknown", async () => {
+    const user = userEvent.setup();
+    const { MemorizeCard } = await importModule<MemorizeCardModule>("@/components/MemorizeCard");
+    render(<MemorizeCard expression={expression} />);
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    expect(screen.getByText(expression.english)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+
+    expect(screen.queryByText(expression.english)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /정답 보기/ })).toBeInTheDocument();
+  });
 });

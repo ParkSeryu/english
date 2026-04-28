@@ -52,7 +52,7 @@ export function MemorizeCard({ expression, returnTo = "/memorize" }: { expressio
             ) : null}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <form action={knownAction}><button type="submit" className="btn-secondary min-h-14 w-full">맞췄음</button></form>
-              <form action={unknownAction}><button type="submit" className="min-h-14 w-full rounded-full bg-amber-500 px-5 py-3 font-black text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600">모름</button></form>
+              <form action={unknownAction} onSubmit={() => setRevealed(false)}><button type="submit" className="min-h-14 w-full rounded-full bg-amber-500 px-5 py-3 font-black text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600">모름</button></form>
             </div>
           </div>
         </>
