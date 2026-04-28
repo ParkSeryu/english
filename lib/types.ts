@@ -1,3 +1,8 @@
+export const STUDY_STATUSES = ["new", "learning", "memorized", "confusing"] as const;
+export type StudyStatus = (typeof STUDY_STATUSES)[number];
+export const REVIEW_MODES = ["meaning-to-expression", "expression-to-meaning", "structure-to-pattern"] as const;
+export type ReviewMode = (typeof REVIEW_MODES)[number];
+
 export type UserIdentity = {
   id: string;
   email?: string | null;

@@ -9,8 +9,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "영어 복습 앱",
-  description: "LLM이 정리한 학원 영어 내용을 모바일에서 복습하는 리뷰 앱."
+  title: "영어 표현 암기",
+  description: "매일 배운 영어 문장을 한국어 프롬프트로 떠올리는 암기 앱."
 };
 
 export const viewport: Viewport = {
@@ -26,7 +26,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="ko">
       <body className={inter.className}>
         <AppNav user={user} />
-        <main className="mx-auto min-h-[calc(100vh-64px)] max-w-3xl px-4 py-6 sm:py-8">{children}</main>
+        <main className="mx-auto min-h-[calc(100vh-64px)] max-w-3xl px-4 pb-28 pt-6 sm:py-8">{children}</main>
       </body>
     </html>
   );

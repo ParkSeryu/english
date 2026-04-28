@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function CardsRedirectPage() {
-  redirect("/lessons");
+export default function LegacyRedirectPage() {
+  redirect("/expressions");
 }

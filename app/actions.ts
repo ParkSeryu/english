@@ -3,63 +3,72 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { flattenZodErrors, parseItemNotesFormData, studyStatusSchema } from "@/lib/validation";
 import { requireCurrentUser } from "@/lib/auth";
+import { flattenZodErrors, parseCardMemoFormData, parseQuestionNoteFormData } from "@/lib/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getLessonStore } from "@/lib/lesson-store";
-import type { ActionState, StudyStatus } from "@/lib/types";
+import { getExpressionStore } from "@/lib/lesson-store";
+import type { ActionState } from "@/lib/types";
 
 function revalidateAppPaths() {
   revalidatePath("/");
-  revalidatePath("/lessons");
-  revalidatePath("/review");
-  revalidatePath("/review/confusing");
+  revalidatePath("/expressions");
+  revalidatePath("/memorize");
+  revalidatePath("/questions");
 }
 
 function errorState(error: unknown): ActionState {
-  return {
-    ok: false,
-    message: error instanceof Error ? error.message : "문제가 발생했습니다. 다시 시도해 주세요."
-  };
+  return { ok: false, message: error instanceof Error ? error.message : "문제가 발생했습니다. 다시 시도해 주세요." };
 }
 
-export async function updateItemNotesAction(itemId: string, _previousState: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = parseItemNotesFormData(formData);
-  if (!parsed.success) {
-    return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "메모 내용을 확인해 주세요." };
-  }
+export async function updateExpressionMemoAction(expressionId: string, _previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseCardMemoFormData(formData);
+  if (!parsed.success) return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "메모 내용을 확인해 주세요." };
 
   try {
     const user = await requireCurrentUser();
-    await getLessonStore(user).updateItemNotes(itemId, parsed.data);
+    await getExpressionStore(user).updateExpressionMemo(expressionId, parsed.data);
     revalidateAppPaths();
-    revalidatePath(`/items/${itemId}`);
+    revalidatePath(`/expressions/${expressionId}`);
     return { ok: true, message: "메모를 저장했습니다." };
   } catch (error) {
     return errorState(error);
   }
 }
 
-export async function markItemStatusAction(itemId: string, status: StudyStatus, returnTo = "/review") {
-  const parsedStatus = studyStatusSchema.safeParse(status);
-  if (!parsedStatus.success || parsedStatus.data === "new") {
-    throw new Error("복습 상태가 올바르지 않습니다.");
-  }
-
+export async function recordExpressionReviewAction(expressionId: string, result: "known" | "unknown", returnTo = "/memorize") {
+  if (result !== "known" && result !== "unknown") throw new Error("암기 결과가 올바르지 않습니다.");
   const user = await requireCurrentUser();
-  await getLessonStore(user).markReviewed(itemId, parsedStatus.data);
+  await getExpressionStore(user).recordReviewResult(expressionId, result);
   revalidateAppPaths();
-  revalidatePath(`/items/${itemId}`);
-  redirect(returnTo.startsWith("/") ? returnTo : "/review");
+  revalidatePath(`/expressions/${expressionId}`);
+  redirect(returnTo.startsWith("/") ? returnTo : "/memorize");
+}
+
+export async function createQuestionNoteAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseQuestionNoteFormData(formData);
+  if (!parsed.success) return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "질문 내용을 확인해 주세요." };
+
+  try {
+    const user = await requireCurrentUser();
+    await getExpressionStore(user).createQuestionNote(parsed.data);
+    revalidateAppPaths();
+    return { ok: true, message: "질문거리를 추가했습니다." };
+  } catch (error) {
+    return errorState(error);
+  }
+}
+
+export async function updateQuestionStatusAction(questionId: string, status: "open" | "asked") {
+  const user = await requireCurrentUser();
+  await getExpressionStore(user).updateQuestionNote(questionId, { status });
+  revalidateAppPaths();
+  redirect("/questions");
 }
 
 export async function signInAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-
-  if (!email || !password) {
-    return { ok: false, message: "이메일과 비밀번호를 입력해 주세요." };
-  }
+  if (!email || !password) return { ok: false, message: "이메일과 비밀번호를 입력해 주세요." };
 
   try {
     const supabase = await createServerSupabaseClient();
@@ -76,10 +85,7 @@ export async function signInAction(_previousState: ActionState, formData: FormDa
 export async function signUpAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-
-  if (!email || password.length < 6) {
-    return { ok: false, message: "이메일과 6자 이상의 비밀번호를 입력해 주세요." };
-  }
+  if (!email || password.length < 6) return { ok: false, message: "이메일과 6자 이상의 비밀번호를 입력해 주세요." };
 
   try {
     const supabase = await createServerSupabaseClient();

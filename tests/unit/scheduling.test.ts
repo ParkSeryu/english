@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { scheduleReviewQueue } from "@/lib/scheduling";
-import type { StudyItem } from "@/lib/types";
+import { scheduleMemorizationQueue } from "@/lib/scheduling";
+import type { ExpressionCard } from "@/lib/types";
 
-function item(overrides: Partial<StudyItem>): StudyItem {
+function card(overrides: Partial<ExpressionCard>): ExpressionCard {
   return {
     id: overrides.id ?? crypto.randomUUID(),
-    lesson_id: "lesson-a",
+    expression_day_id: "day-a",
     owner_id: "user-a",
-    expression: "have to ~",
-    meaning_ko: "~해야 한다",
-    core_nuance: "의무나 필요성",
-    structure_note: "have to + 동사원형",
-    grammar_note: "3인칭 단수는 has to",
+    english: "have to ~",
+    korean_prompt: "~해야 한다",
+    nuance_note: null,
+    structure_note: null,
+    grammar_note: null,
     user_memo: null,
-    confusion_note: null,
-    status: "new",
+    source_order: 0,
+    known_count: 0,
+    unknown_count: 0,
     last_reviewed_at: null,
-    review_count: 0,
     created_at: "2026-04-28T00:00:00.000Z",
     updated_at: "2026-04-28T00:00:00.000Z",
     examples: [],
@@ -25,30 +25,28 @@ function item(overrides: Partial<StudyItem>): StudyItem {
   };
 }
 
-describe("scheduleReviewQueue", () => {
-  it("prioritizes confusing, new, learning, then memorized items", () => {
-    const queue = scheduleReviewQueue([
-      item({ id: "memorized", status: "memorized" }),
-      item({ id: "learning", status: "learning" }),
-      item({ id: "new", status: "new" }),
-      item({ id: "confusing", status: "confusing" })
-    ]);
-
-    expect(queue.map((candidate) => candidate.id)).toEqual(["confusing", "new", "learning", "memorized"]);
+describe("scheduleMemorizationQueue", () => {
+  it("prioritizes higher unknown_count first", () => {
+    const queue = scheduleMemorizationQueue([card({ id: "low", unknown_count: 1 }), card({ id: "high", unknown_count: 3 }), card({ id: "none", unknown_count: 0 })]);
+    expect(queue.map((candidate) => candidate.id)).toEqual(["high", "low", "none"]);
   });
 
-  it("sorts least-recently-reviewed items first within the same status", () => {
-    const queue = scheduleReviewQueue([
-      item({ id: "recent", status: "confusing", last_reviewed_at: "2026-04-28T03:00:00.000Z" }),
-      item({ id: "never", status: "confusing", last_reviewed_at: null }),
-      item({ id: "older", status: "confusing", last_reviewed_at: "2026-04-27T03:00:00.000Z" })
+  it("boosts never-reviewed expressions, then penalizes high known_count", () => {
+    const queue = scheduleMemorizationQueue([
+      card({ id: "known-many", known_count: 4, last_reviewed_at: "2026-04-27T00:00:00.000Z" }),
+      card({ id: "never", known_count: 0, last_reviewed_at: null }),
+      card({ id: "known-once", known_count: 1, last_reviewed_at: "2026-04-26T00:00:00.000Z" })
     ]);
-
-    expect(queue.map((candidate) => candidate.id)).toEqual(["never", "older", "recent"]);
+    expect(queue.map((candidate) => candidate.id)).toEqual(["never", "known-once", "known-many"]);
   });
 
-  it("keeps daily queues small and configurable", () => {
-    const items = Array.from({ length: 12 }, (_, index) => item({ id: String(index), status: "new" }));
-    expect(scheduleReviewQueue(items, 5)).toHaveLength(5);
+  it("uses source order as the final stable tie-breaker", () => {
+    const queue = scheduleMemorizationQueue([card({ id: "second", source_order: 2 }), card({ id: "first", source_order: 1 })]);
+    expect(queue.map((candidate) => candidate.id)).toEqual(["first", "second"]);
+  });
+
+  it("keeps queues small and configurable", () => {
+    const cards = Array.from({ length: 12 }, (_, index) => card({ id: String(index), source_order: index }));
+    expect(scheduleMemorizationQueue(cards, 5)).toHaveLength(5);
   });
 });
