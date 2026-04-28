@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
 import { getCurrentUser } from "@/lib/auth";
-import { hasIngestionEnv, hasSupabaseEnv } from "@/lib/env";
+import { hasSupabaseEnv } from "@/lib/env";
 import { getExpressionStore } from "@/lib/lesson-store";
 
 export const dynamic = "force-dynamic";
@@ -80,8 +80,6 @@ export default async function DashboardPage() {
           </div>
         </section>
       ) : null}
-
-      {!hasIngestionEnv() ? <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">LLM ingestion API 환경 변수가 아직 설정되지 않았습니다. INGESTION_API_TOKEN과 INGESTION_OWNER_ID가 필요합니다.</div> : null}
     </div>
   );
 }
