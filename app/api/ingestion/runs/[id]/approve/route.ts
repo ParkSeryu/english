@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { authenticateIngestionRequest } from "@/lib/ingestion/request-auth";
-import { getAdminLessonStore } from "@/lib/lesson-store";
+import { getAdminExpressionStore } from "@/lib/lesson-store";
 
 type Params = Promise<{ id: string }>;
 
@@ -14,9 +14,9 @@ export async function POST(request: Request, { params }: { params: Params }) {
   const { id } = await params;
 
   try {
-    const result = await getAdminLessonStore(userOrResponse).approveDraft(id, approvalText);
-    return NextResponse.json({ lesson: result.lesson, itemUrls: result.itemUrls });
+    const result = await getAdminExpressionStore(userOrResponse).approveDraft(id, approvalText);
+    return NextResponse.json({ expressionDay: result.expressionDay, expressionUrls: result.expressionUrls });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to approve lesson" }, { status: 400 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to approve expression day" }, { status: 400 });
   }
 }

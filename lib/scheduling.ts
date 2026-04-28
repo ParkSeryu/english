@@ -16,8 +16,9 @@ export function compareExpressionsForMemorization(a: ExpressionCard, b: Expressi
   const knownDelta = a.known_count - b.known_count;
   if (knownDelta !== 0) return knownDelta;
 
-  const reviewedDelta = reviewedRank(a) - reviewedRank(b);
-  if (reviewedDelta !== 0) return reviewedDelta;
+  const aReviewed = reviewedRank(a);
+  const bReviewed = reviewedRank(b);
+  if (aReviewed !== bReviewed) return aReviewed < bReviewed ? -1 : 1;
 
   return a.source_order - b.source_order || Date.parse(a.created_at) - Date.parse(b.created_at);
 }
