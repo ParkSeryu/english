@@ -15,8 +15,10 @@ The core experience is:
 
 1. User tells the LLM what they learned.
 2. LLM converts that lesson into structured study items.
-3. LLM inserts the structured items into the app database.
-4. User opens the app to review, memorize, mark confidence, and add personal notes.
+3. LLM shows a structured draft back to the user before saving.
+4. User can revise the draft through multiple back-and-forth turns.
+5. LLM inserts the structured items into the app database only after explicit user approval.
+6. User opens the app to review, memorize, mark confidence, and add personal notes.
 
 ## Primary User
 
@@ -82,9 +84,12 @@ LLM inserts structured items like:
 #### LLM ingestion path
 
 - Define a structured lesson-ingestion contract for LLM/tool use.
-- Provide an LLM-facing command/skill/API path that can add lesson material to Supabase.
+- Provide an LLM-facing command/skill/API path that can prepare lesson material for Supabase.
 - Accept natural-language lesson input outside the app UI.
-- Let the LLM create structured study items from the lesson input.
+- Let the LLM create structured study item drafts from the lesson input.
+- Require an explicit user approval step before insertion.
+- Support multiple draft-revision turns before approval.
+- Let the user say things like `수정해줘`, `예문 더 쉽게`, `이건 선생님 설명이랑 달라`, or `저장해줘`.
 - Store the original raw lesson note for traceability.
 - Store whether fields were user-provided vs LLM-normalized where practical.
 
@@ -158,9 +163,9 @@ Rationale: English explanations can be subtly wrong or not match what the teache
 
 ### Decision 4 — Ingestion safety
 
-**Decision:** LLM can create/add items, but destructive actions such as delete/overwrite should require explicit confirmation or be out of scope.
+**Decision:** LLM can draft items freely, but cannot insert them until the user explicitly approves. Destructive actions such as delete/overwrite require explicit confirmation or remain out of scope.
 
-Rationale: Prevent accidental loss from assistant mistakes.
+Rationale: Prevent incorrect LLM interpretations or assistant mistakes from polluting or damaging the learner's study material.
 
 ## Proposed Data Model
 
@@ -212,7 +217,7 @@ This supersedes the previous manual-card-centric model.
 - `owner_id uuid references auth.users(id)`
 - `raw_input text not null`
 - `normalized_payload jsonb not null`
-- `status text not null` check in `('drafted', 'inserted', 'failed')`
+- `status text not null` check in `('drafted', 'revised', 'approved', 'inserted', 'failed')`
 - `error_message text`
 - `created_at timestamptz not null default now()`
 
@@ -224,6 +229,46 @@ This supersedes the previous manual-card-centric model.
 - LLM ingestion must operate as the authenticated user or through a safe server-side route that assigns `owner_id` from the authenticated session.
 - No public no-auth insert endpoint.
 - Service role keys must never be exposed to the browser.
+
+## Confirm-Before-Save Workflow
+
+The ingestion flow must be draft-first and approval-gated. The LLM must not insert lesson data immediately after parsing the user's rough lesson note.
+
+### Required flow
+
+1. **Capture** — user describes what they learned in natural language.
+2. **Draft** — LLM returns a structured preview with lesson title, expressions, meanings, nuance, forms, examples, confusion points, and proposed user memo/source note.
+3. **Review/Revise** — user can request changes in natural language.
+4. **Repeat** — LLM updates the draft and shows the revised preview again.
+5. **Explicit approval** — insertion happens only when the user gives a clear save command such as `저장해`, `앱에 넣어`, `이대로 추가해`, or equivalent.
+6. **Insert** — validated payload is saved to Supabase.
+7. **Confirm saved result** — LLM reports what was saved and where it appears in the app.
+
+### Non-approval examples
+
+The following should not save automatically:
+
+- `좋네`
+- `괜찮아 보임`
+- `예문 좀 더 쉽게 바꿔줘`
+- `have to 설명을 더 추가해줘`
+- `I am used to는 과거에 익숙해졌다는 느낌 아닌가?`
+
+These are feedback/revision turns, not save approval.
+
+### Draft state
+
+The assistant/skill should maintain an in-progress draft outside the final study tables until approval. This can be implemented as:
+
+- an `ingestion_runs` row with `status = 'drafted'`,
+- a local draft artifact under `.omx/`,
+- or an app-side draft table/route,
+
+as long as unapproved drafts do not appear as reviewable study material.
+
+### Safety rule
+
+LLM ingestion may create records only after approval. It may not delete, bulk overwrite, or silently modify existing lessons in MVP. Corrections to existing saved material should be treated as a separate explicit edit flow.
 
 ## LLM Ingestion Contract
 
@@ -299,16 +344,28 @@ The assistant/skill should output a payload like:
 
 ## User Stories
 
-### US-001 — Add lesson through LLM
+### US-001 — Draft lesson through LLM
 
-As a learner, I can tell the LLM what I learned so that it creates structured study items without me filling forms in the app.
+As a learner, I can tell the LLM what I learned so that it creates a structured draft without me filling forms in the app.
 
 Acceptance:
 
-- Natural-language lesson input can be converted into the ingestion payload.
+- Natural-language lesson input can be converted into a preview draft.
+- The draft is shown before saving.
+- The user can request revisions without creating app records.
 - Payload validates before insertion.
-- Inserted lesson and items appear in the app.
 - Raw input is stored for traceability.
+
+### US-001B — Approve before saving
+
+As a learner, I must explicitly approve the final draft before it is inserted into the app so that incorrect LLM interpretations do not pollute my review material.
+
+Acceptance:
+
+- LLM does not save immediately after first draft.
+- Revision feedback updates the draft instead of inserting.
+- Only clear approval phrases trigger insertion.
+- Inserted lesson and items appear in the app after approval.
 
 ### US-002 — Review structured lesson notes
 
@@ -407,7 +464,7 @@ Shift MVP direction to LLM-assisted lesson ingestion with a mobile review/memori
 
 ### Drivers
 
-- User wants to tell the LLM what was learned and have it inserted into the app.
+- User wants to tell the LLM what was learned, review/refine the generated draft, and then have it inserted into the app only after explicit approval.
 - User wants review and memorization, not manual card entry.
 - User wants personal memo support.
 
@@ -423,13 +480,13 @@ This option best matches the user's actual workflow: conversational capture thro
 ### Consequences
 
 - Existing manual-card MVP will need schema and UI refactor.
-- Need an ingestion API/CLI/skill.
+- Need a draft-aware ingestion API/CLI/skill with explicit approval gating.
 - Need stricter validation and safety around LLM-generated data.
 - Supabase Auth/RLS remains required.
 
 ### Follow-ups
 
 1. Define the exact LLM skill interface: local Codex skill, CLI script, or protected API route.
-2. Decide whether LLM insertion uses user's Supabase session or a server-side authenticated route.
+2. Decide how draft state is stored before approval and whether insertion uses user's Supabase session or a server-side authenticated route.
 3. Refactor schema from `study_cards/card_examples` to `lessons/study_items/study_examples`.
 4. Redesign app screens around lessons/items/review rather than card entry.
