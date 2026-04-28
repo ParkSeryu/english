@@ -14,10 +14,9 @@ export default async function DashboardPage() {
     return (
       <div className="space-y-6">
         <section className="rounded-[2rem] bg-ink p-6 text-white shadow-card">
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-200">Daily expressions</p>
-          <h1 className="mt-3 text-3xl font-black leading-tight">한국어를 보고 오늘 배운 영어 문장을 떠올리세요.</h1>
-          <p className="mt-4 text-sm leading-6 text-slate-200">LLM 초안을 확인하고 명시적으로 승인한 표현만 저장됩니다. 앱은 입력보다 암기에 집중합니다.</p>
-          <Link href="/login" className="mt-6 inline-flex rounded-full bg-white px-5 py-3 font-black text-ink">로그인하고 시작하기</Link>
+          <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-200">English Recall</p>
+          <h1 className="mt-3 text-3xl font-black leading-tight">오늘 배운 표현, 바로 외우기</h1>
+          <Link href="/login" className="mt-6 inline-flex rounded-full bg-white px-5 py-3 font-black text-ink">시작하기</Link>
         </section>
         {!hasSupabaseEnv() ? <EnvWarning /> : null}
       </div>

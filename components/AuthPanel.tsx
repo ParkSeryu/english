@@ -14,7 +14,6 @@ export function AuthPanel() {
     <div className="grid gap-5 md:grid-cols-2">
       <form action={signIn} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
         <h2 className="text-xl font-bold text-ink">로그인</h2>
-        <p className="mt-1 text-sm text-slate-600">Supabase 이메일/비밀번호 로그인으로 내 복습 데이터를 보호합니다.</p>
         <label className="mt-5 block text-sm font-semibold text-slate-700" htmlFor="signin-email">
           이메일
         </label>
@@ -33,7 +32,6 @@ export function AuthPanel() {
 
       <form action={signUp} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
         <h2 className="text-xl font-bold text-ink">계정 만들기</h2>
-        <p className="mt-1 text-sm text-slate-600">레슨과 복습 기록을 내 계정에만 저장하려면 계정을 만드세요.</p>
         <label className="mt-5 block text-sm font-semibold text-slate-700" htmlFor="signup-email">
           이메일
         </label>

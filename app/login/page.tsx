@@ -13,11 +13,7 @@ export default async function LoginPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-700">Supabase 로그인</p>
-        <h1 className="mt-2 text-3xl font-black text-ink">복습하려면 먼저 로그인하세요</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          The MVP uses Supabase 로그인, shared expression content, and per-user RLS for progress/questions. Do not deploy publicly without configured migrations.
-        </p>
+        <h1 className="text-3xl font-black text-ink">영어 표현 복습</h1>
       </div>
       {!hasSupabaseEnv() ? (
         <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
