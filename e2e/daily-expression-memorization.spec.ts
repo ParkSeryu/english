@@ -28,6 +28,8 @@ test("mobile user memorizes a daily expression, marks unknown, and adds a questi
   await expect(page.getByText("The birth rate in Korea is decreasing.")).toBeVisible();
   await expect(page.getByText(/decrease는 '감소하다'/)).toBeVisible();
   await page.getByRole("button", { name: /모름/ }).click();
+  await expect(page.getByText("저는 먹지 않으려고 노력해요.")).toBeVisible();
+  await expect(page.getByText("I try not to eat.")).toHaveCount(0);
 
   await page.getByRole("link", { name: /^질문거리$/ }).click();
   await page.getByLabel(/질문/).fill("decrease와 reduce 차이를 수업 때 물어보기");
