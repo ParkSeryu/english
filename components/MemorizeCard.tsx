@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { recordExpressionReviewAction } from "@/app/actions";
 import type { ExpressionCard } from "@/lib/types";
 
-export function MemorizeCard({ expression, returnTo = "/memorize" }: { expression: ExpressionCard; returnTo?: string }) {
+export function MemorizeCard({ expression, returnTo = "/memorize", onReviewSubmit }: { expression: ExpressionCard; returnTo?: string; onReviewSubmit?: () => void }) {
   const [revealed, setRevealed] = useState(false);
   const knownAction = useMemo(() => recordExpressionReviewAction.bind(null, expression.id, "known", returnTo), [expression.id, returnTo]);
   const unknownAction = useMemo(() => recordExpressionReviewAction.bind(null, expression.id, "unknown", returnTo), [expression.id, returnTo]);
@@ -51,8 +51,8 @@ export function MemorizeCard({ expression, returnTo = "/memorize" }: { expressio
               </section>
             ) : null}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form action={knownAction}><button type="submit" className="btn-secondary min-h-14 w-full">맞췄음</button></form>
-              <form action={unknownAction} onSubmit={() => setRevealed(false)}><button type="submit" className="min-h-14 w-full rounded-full bg-amber-500 px-5 py-3 font-black text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600">모름</button></form>
+              <form action={knownAction} onSubmit={onReviewSubmit}><button type="submit" className="btn-secondary min-h-14 w-full">맞췄음</button></form>
+              <form action={unknownAction} onSubmit={() => { setRevealed(false); onReviewSubmit?.(); }}><button type="submit" className="min-h-14 w-full rounded-full bg-amber-500 px-5 py-3 font-black text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600">모름</button></form>
             </div>
           </div>
         </>
