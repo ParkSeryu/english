@@ -13,8 +13,8 @@ export function AppNav({ user }: { user: UserIdentity | null }) {
         <nav className="flex items-center gap-2 text-sm font-bold">
           {user ? (
             <>
-              <Link href="/cards" className="nav-link">
-                카드
+              <Link href="/lessons" className="nav-link">
+                레슨
               </Link>
               <Link href="/review" className="nav-link">
                 복습

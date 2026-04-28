@@ -3,15 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { flattenZodErrors, parseCardFormData } from "@/lib/validation";
+import { flattenZodErrors, parseItemNotesFormData, studyStatusSchema } from "@/lib/validation";
 import { requireCurrentUser } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getCardStore } from "@/lib/card-store";
-import type { ActionState } from "@/lib/types";
+import { getLessonStore } from "@/lib/lesson-store";
+import type { ActionState, StudyStatus } from "@/lib/types";
 
 function revalidateAppPaths() {
   revalidatePath("/");
-  revalidatePath("/cards");
+  revalidatePath("/lessons");
   revalidatePath("/review");
   revalidatePath("/review/confusing");
 }
@@ -23,66 +23,34 @@ function errorState(error: unknown): ActionState {
   };
 }
 
-export async function createCardAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = parseCardFormData(formData);
+export async function updateItemNotesAction(itemId: string, _previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseItemNotesFormData(formData);
   if (!parsed.success) {
-    return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "필수 항목을 확인해 주세요." };
+    return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "메모 내용을 확인해 주세요." };
   }
 
   try {
     const user = await requireCurrentUser();
-    await getCardStore(user).createCard(parsed.data);
+    await getLessonStore(user).updateItemNotes(itemId, parsed.data);
     revalidateAppPaths();
+    revalidatePath(`/items/${itemId}`);
+    return { ok: true, message: "메모를 저장했습니다." };
   } catch (error) {
     return errorState(error);
   }
-
-  redirect("/cards");
 }
 
-export async function updateCardAction(cardId: string, _previousState: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = parseCardFormData(formData);
-  if (!parsed.success) {
-    return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "필수 항목을 확인해 주세요." };
+export async function markItemStatusAction(itemId: string, status: StudyStatus, returnTo = "/review") {
+  const parsedStatus = studyStatusSchema.safeParse(status);
+  if (!parsedStatus.success || parsedStatus.data === "new") {
+    throw new Error("복습 상태가 올바르지 않습니다.");
   }
 
-  try {
-    const user = await requireCurrentUser();
-    await getCardStore(user).updateCard(cardId, parsed.data);
-    revalidateAppPaths();
-  } catch (error) {
-    return errorState(error);
-  }
-
-  redirect("/cards");
-}
-
-export async function deleteCardAction(cardId: string) {
   const user = await requireCurrentUser();
-  await getCardStore(user).deleteCard(cardId);
+  await getLessonStore(user).markReviewed(itemId, parsedStatus.data);
   revalidateAppPaths();
-  redirect("/cards");
-}
-
-export async function markKnownAction(cardId: string) {
-  const user = await requireCurrentUser();
-  await getCardStore(user).markReviewed(cardId, "known");
-  revalidateAppPaths();
-  redirect("/review");
-}
-
-export async function markConfusingAction(cardId: string) {
-  const user = await requireCurrentUser();
-  await getCardStore(user).markReviewed(cardId, "confusing");
-  revalidateAppPaths();
-  redirect("/review");
-}
-
-export async function markKnownFromConfusingAction(cardId: string) {
-  const user = await requireCurrentUser();
-  await getCardStore(user).markReviewed(cardId, "known");
-  revalidateAppPaths();
-  redirect("/review/confusing");
+  revalidatePath(`/items/${itemId}`);
+  redirect(returnTo.startsWith("/") ? returnTo : "/review");
 }
 
 export async function signInAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {

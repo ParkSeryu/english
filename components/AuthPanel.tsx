@@ -33,7 +33,7 @@ export function AuthPanel() {
 
       <form action={signUp} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
         <h2 className="text-xl font-bold text-ink">계정 만들기</h2>
-        <p className="mt-1 text-sm text-slate-600">카드를 저장하기 전에 내 데이터만 볼 수 있는 계정을 만드세요.</p>
+        <p className="mt-1 text-sm text-slate-600">레슨과 복습 기록을 내 계정에만 저장하려면 계정을 만드세요.</p>
         <label className="mt-5 block text-sm font-semibold text-slate-700" htmlFor="signup-email">
           이메일
         </label>

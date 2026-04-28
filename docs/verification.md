@@ -12,14 +12,17 @@ Required gates from the test spec:
 Manual QA checklist:
 
 - Dashboard primary review CTA is visible on a 390 x 844 viewport.
-- Create a card with English, Korean meaning, grammar memo, and example.
-- Refresh and confirm persistence in the configured backing store.
-- Edit the card and confirm `updated_at` changes.
-- Reveal review hides meaning/memo/examples before reveal.
-- Mark confusing, then confirm confusing-only review surfaces that card.
-- Mark known and confirm status changes.
-- Confirm empty states for no cards and no confusing cards.
-- Confirm no AI generation, exam/ranking, broad note, or voice/pronunciation UI appears.
+- LLM draft/revision is previewed outside the review UI and does not create lessons/items before approval.
+- Ambiguous feedback such as `좋네` does not insert app data.
+- Explicit approval such as `이대로 앱에 넣어줘` inserts one lesson with study items/examples.
+- Lesson list and lesson detail show the inserted `have to ~` / `I am used to ~` material.
+- Item detail shows meaning, nuance, structure, grammar, examples, user memo, and confusion note.
+- User memo and confusion note persist after refresh.
+- Reveal review hides the answer before reveal.
+- Mark confusing, then confirm confusing-only review surfaces that expression first.
+- Mark memorized/learning and confirm status changes.
+- Confirm empty states for no lessons and no confusing expressions.
+- Confirm no full in-app AI tutor, exam/ranking, or voice/pronunciation UI appears.
 
 Convenience command:
 

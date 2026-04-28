@@ -1,18 +1,19 @@
-import type { StudyCard } from "@/lib/types";
+import type { StudyItem } from "@/lib/types";
 
-const statusPriority: Record<StudyCard["status"], number> = {
+const statusPriority: Record<StudyItem["status"], number> = {
   confusing: 0,
   new: 1,
-  known: 2
+  learning: 2,
+  memorized: 3
 };
 
-function reviewedRank(card: StudyCard): number {
-  if (!card.last_reviewed_at) return Number.NEGATIVE_INFINITY;
-  const timestamp = Date.parse(card.last_reviewed_at);
+function reviewedRank(item: StudyItem): number {
+  if (!item.last_reviewed_at) return Number.NEGATIVE_INFINITY;
+  const timestamp = Date.parse(item.last_reviewed_at);
   return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
 }
 
-export function compareCardsForReview(a: StudyCard, b: StudyCard) {
+export function compareItemsForReview(a: StudyItem, b: StudyItem) {
   const statusDelta = statusPriority[a.status] - statusPriority[b.status];
   if (statusDelta !== 0) return statusDelta;
 
@@ -22,6 +23,6 @@ export function compareCardsForReview(a: StudyCard, b: StudyCard) {
   return Date.parse(a.created_at) - Date.parse(b.created_at);
 }
 
-export function scheduleReviewQueue(cards: StudyCard[], limit = 10) {
-  return [...cards].sort(compareCardsForReview).slice(0, limit);
+export function scheduleReviewQueue(items: StudyItem[], limit = 10) {
+  return [...items].sort(compareItemsForReview).slice(0, limit);
 }

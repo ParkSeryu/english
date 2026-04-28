@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { resetMemoryCardStoreForTests } from "@/lib/card-store";
+import { resetMemoryLessonStoreForTests } from "@/lib/lesson-store";
 import { isE2EMemoryMode } from "@/lib/test-mode";
 
 export async function POST() {
@@ -8,6 +8,6 @@ export async function POST() {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  resetMemoryCardStoreForTests();
+  resetMemoryLessonStoreForTests();
   return NextResponse.json({ ok: true });
 }
