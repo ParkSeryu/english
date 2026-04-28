@@ -7,7 +7,7 @@ Mobile-first app for memorizing English sentences learned in class. The user giv
 - Next.js App Router + TypeScript + Tailwind CSS
 - Supabase Auth + Supabase Postgres persistence
 - Owner-scoped Row Level Security (RLS)
-- Token-protected LLM ingestion route for draft/revise/approve writes
+- Token-protected Codex/assistant ingestion route for draft/revise/approve writes
 - Vercel Hobby + Supabase Free for a personal/non-commercial MVP, within free-tier usage caps
 
 Public hosted use without Supabase Auth and owner-scoped RLS is intentionally blocked by product policy. Public no-auth expression ingestion is also intentionally blocked.
@@ -43,13 +43,14 @@ Excluded from MVP:
 npm install
 cp .env.example .env.local
 # Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-# For LLM ingestion, also set server-only INGESTION_API_TOKEN, INGESTION_OWNER_ID, and SUPABASE_SERVICE_ROLE_KEY.
+# For Codex/assistant ingestion, also set server-only INGESTION_API_TOKEN, INGESTION_OWNER_ID, and SUPABASE_SERVICE_ROLE_KEY.
+# INGESTION_API_TOKEN is a random app secret, not an OpenAI/LLM API key.
 npm run dev
 ```
 
 Create a Supabase project, enable email/password Auth, then apply all migrations in `supabase/migrations/` in timestamp order.
 
-## LLM ingestion safety
+## Codex/assistant ingestion safety
 
 The ingestion route stores draft/revision payloads in `ingestion_runs`; it does not create reviewable `expression_days` or `expressions` until the approval endpoint receives an explicit save phrase such as `저장해`, `앱에 넣어줘`, or `이대로 추가해`.
 
