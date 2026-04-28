@@ -1,0 +1,29 @@
+# Deep Interview Context Snapshot: English Review App
+
+- Task statement: Plan an English conversation review app for daily study.
+- Desired outcome: A mobile-friendly web app for reviewing and memorizing lessons from the user's academy.
+- Stated solution: Build an app focused on sentences, expressions, and some theoretical notes rather than isolated vocabulary.
+- Probable intent hypothesis: Reduce forgetting by turning academy materials into a repeatable daily review workflow optimized for phone usage.
+- Known facts/evidence:
+  - User studies at an English academy and wants to review what they learned there.
+  - Content includes sentences, expressions, and theory-like material.
+  - Primary use is on a phone; web is acceptable if mobile-first.
+  - User wants periodic checks and daily viewing/study.
+  - Codebase inspection found an empty/greenfield workspace with only `.omx` runtime files; no app scaffold exists.
+- Constraints:
+  - Mobile-first UI.
+  - Greenfield project; stack and data model are not yet chosen.
+  - No implementation should happen inside deep-interview mode.
+- Unknowns/open questions:
+  - The core learning flow: browse, quiz, spaced repetition, flashcards, typing/speaking, or mixed.
+  - Who enters study content and how much structure each item needs.
+  - Whether login/sync/multi-device/cloud storage are required in the first version.
+  - Success metrics and acceptance criteria.
+  - MVP scope vs later features.
+- Decision-boundary unknowns:
+  - Which product decisions OMX may make automatically.
+  - Which technology choices require user confirmation.
+  - Which features are explicitly out of scope for the first pass.
+- Likely codebase touchpoints:
+  - None yet; greenfield scaffold likely needed after planning.
+- Prompt-safe initial-context summary status: not_needed

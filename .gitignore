@@ -1,0 +1,17 @@
+# Secrets
+.env*
+!.env.example
+
+# Dependencies and build outputs
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+
+# OMX runtime/cache state (keep durable planning artifacts tracked)
+.omx/logs/
+.omx/state/
+.omx/metrics.json
+.omx/tmux-hook.json
