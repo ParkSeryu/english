@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth";
@@ -96,6 +97,26 @@ export async function signUpAction(_previousState: ActionState, formData: FormDa
   }
 
   return { ok: true, message: "계정을 만들었습니다. 이메일 확인이 켜져 있다면 메일을 확인한 뒤 로그인하세요." };
+}
+
+
+export async function resetPasswordAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { ok: false, message: "가입한 이메일을 입력해 주세요." };
+
+  try {
+    const headerStore = await headers();
+    const origin = headerStore.get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL;
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: origin ? `${origin}/auth/callback?next=/login` : undefined
+    });
+    if (error) return { ok: false, message: error.message };
+  } catch (error) {
+    return errorState(error);
+  }
+
+  return { ok: true, message: "비밀번호 재설정 메일을 보냈습니다. 메일함을 확인해 주세요." };
 }
 
 export async function signOutAction() {
