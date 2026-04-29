@@ -34,7 +34,7 @@ test("mobile user memorizes a daily expression, marks unknown, and adds a questi
   await page.getByRole("link", { name: /^질문거리$/ }).click();
   await page.getByLabel(/질문/).fill("decrease와 reduce 차이를 수업 때 물어보기");
   await page.getByRole("button", { name: /추가/ }).click();
-  await expect(page.getByText("decrease와 reduce 차이를 수업 때 물어보기")).toBeVisible();
+  await expect(page.locator("article").filter({ hasText: "decrease와 reduce 차이를 수업 때 물어보기" })).toBeVisible();
 
   await page.getByRole("button", { name: /물어봄/ }).click();
   await expect(page.getByRole("button", { name: /다시 질문 예정/ })).toBeVisible();

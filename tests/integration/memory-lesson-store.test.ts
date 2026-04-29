@@ -43,6 +43,11 @@ describe("MemoryExpressionStore integration behavior", () => {
     const question = await store.createQuestionNote({ questionText: "must와 have to 차이는?" });
     expect(question.status).toBe("open");
     expect((await store.updateQuestionNote(question.id, { status: "asked" })).status).toBe("asked");
+    expect(await store.updateQuestionNote(question.id, { questionText: "must와 have to 뉘앙스 차이는?", answerNote: "must는 더 강한 의무로 들릴 수 있음", status: "answered" })).toMatchObject({
+      question_text: "must와 have to 뉘앙스 차이는?",
+      answer_note: "must는 더 강한 의무로 들릴 수 있음",
+      status: "answered"
+    });
 
     const queue = await store.getMemorizationQueue();
     expect(queue.map((item) => item.id)).not.toContain(expression.id);

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { clearTrustedAuthHeaders, setTrustedAuthHeaders } from "@/lib/auth-context";
 import { getSupabaseEnv, hasSupabaseEnv } from "@/lib/env";
 import { isInvalidRefreshTokenError, isSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
 import { isE2EMemoryMode } from "@/lib/test-mode";
@@ -27,12 +28,35 @@ function redirectToLogin(request: NextRequest) {
   return NextResponse.redirect(loginUrl);
 }
 
+function nextWithHeaders(headers: Headers) {
+  return NextResponse.next({ request: { headers } });
+}
+
+function copyCookies(source: NextResponse, target: NextResponse) {
+  source.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
+}
+
+function hasAuthCookie(request: NextRequest) {
+  return request.cookies.getAll().some((cookie) => isSupabaseAuthCookie(cookie.name));
+}
+
 export async function middleware(request: NextRequest) {
-  if (isE2EMemoryMode()) return NextResponse.next();
-  if (!hasSupabaseEnv()) return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  clearTrustedAuthHeaders(requestHeaders);
+
+  if (isE2EMemoryMode()) return nextWithHeaders(requestHeaders);
+  if (!hasSupabaseEnv()) return nextWithHeaders(requestHeaders);
+
+  const pathname = request.nextUrl.pathname;
+  const isPublicPath = pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/");
+
+  if (!hasAuthCookie(request)) {
+    if (isProtectedPath(pathname)) return redirectToLogin(request);
+    return nextWithHeaders(requestHeaders);
+  }
 
   const { url, publishableKey } = getSupabaseEnv();
-  const response = NextResponse.next();
+  const response = nextWithHeaders(requestHeaders);
   const supabase = createServerClient(url, publishableKey, {
     cookies: {
       getAll() {
@@ -66,9 +90,6 @@ export async function middleware(request: NextRequest) {
   };
 
   if (error && isInvalidRefreshTokenError(error)) {
-    const pathname = request.nextUrl.pathname;
-    const isPublicPath = pathname === "/login" || pathname.startsWith("/auth/") || pathname.startsWith("/_next/");
-
     clearAuthCookies(response);
 
     if (!isPublicPath) {
@@ -78,17 +99,25 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!data?.user && isProtectedPath(request.nextUrl.pathname)) {
+  if (!data?.user && isProtectedPath(pathname)) {
     const redirectResponse = redirectToLogin(request);
     clearAuthCookies(redirectResponse);
     return redirectResponse;
   }
 
-  if (data?.user && request.nextUrl.pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
+  if (data?.user) {
+    setTrustedAuthHeaders(requestHeaders, { id: data.user.id, email: data.user.email });
   }
 
-  return response;
+  if (data?.user && pathname === "/login") {
+    const redirectResponse = NextResponse.redirect(new URL("/", request.url));
+    copyCookies(response, redirectResponse);
+    return redirectResponse;
+  }
+
+  const finalResponse = nextWithHeaders(requestHeaders);
+  copyCookies(response, finalResponse);
+  return finalResponse;
 }
 
 export const config = {

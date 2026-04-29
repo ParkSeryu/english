@@ -24,6 +24,11 @@ export async function createServerSupabaseClient() {
   });
 }
 
+export async function hasServerSupabaseAuthCookie() {
+  const cookieStore = await cookies();
+  return cookieStore.getAll().some((cookie) => isSupabaseAuthCookie(cookie.name));
+}
+
 export async function clearServerSupabaseAuthCookies() {
   const cookieStore = await cookies();
   const authCookies = cookieStore.getAll().filter((cookie) => isSupabaseAuthCookie(cookie.name));

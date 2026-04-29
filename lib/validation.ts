@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { QUESTION_NOTE_STATUSES } from "@/lib/types";
+
 const nonBlankText = z.string().trim().min(1, "필수 항목입니다");
 const optionalText = (max: number) => z.string().trim().max(max).optional().nullable().transform((value) => value || null);
 
@@ -77,6 +79,10 @@ export const questionNoteSchema = z.object({
   answerNote: z.string().trim().max(3_000, "답변 메모는 3,000자 이내로 입력해 주세요").optional().default("")
 });
 
+export const questionNoteUpdateSchema = questionNoteSchema.extend({
+  status: z.enum(QUESTION_NOTE_STATUSES)
+});
+
 export function parseExpressionIngestionPayload(input: unknown) {
   return expressionIngestionPayloadSchema.safeParse(input);
 }
@@ -89,6 +95,14 @@ export function parseQuestionNoteFormData(formData: FormData) {
   return questionNoteSchema.safeParse({
     questionText: String(formData.get("questionText") ?? "").trim(),
     answerNote: String(formData.get("answerNote") ?? "").trim()
+  });
+}
+
+export function parseQuestionNoteUpdateFormData(formData: FormData) {
+  return questionNoteUpdateSchema.safeParse({
+    questionText: String(formData.get("questionText") ?? "").trim(),
+    answerNote: String(formData.get("answerNote") ?? "").trim(),
+    status: String(formData.get("status") ?? "")
   });
 }
 

@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { cache } from "react";
 
+import { userFromTrustedAuthHeaders } from "@/lib/auth-context";
 import { MissingSupabaseEnvError, hasSupabaseEnv } from "@/lib/env";
 import { isInvalidRefreshTokenError } from "@/lib/supabase/auth-cookie";
 import {
   clearServerSupabaseAuthCookies,
-  createServerSupabaseClient
+  createServerSupabaseClient,
+  hasServerSupabaseAuthCookie
 } from "@/lib/supabase/server";
 import { getE2EFakeUserId } from "@/lib/test-mode";
 import type { UserIdentity } from "@/lib/types";
@@ -19,6 +22,11 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Use
   if (!hasSupabaseEnv()) return null;
 
   try {
+    const trustedMiddlewareUser = userFromTrustedAuthHeaders(await headers());
+    if (trustedMiddlewareUser) return trustedMiddlewareUser;
+
+    if (!(await hasServerSupabaseAuthCookie())) return null;
+
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.auth.getUser();
     if (error) {

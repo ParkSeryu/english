@@ -6,7 +6,7 @@ async function importModule<T>(specifier: string): Promise<T> {
 
 type UserIdentity = { id: string; email?: string };
 type ReviewResult = "known" | "unknown";
-type QuestionStatus = "open" | "asked";
+type QuestionStatus = "open" | "asked" | "answered";
 
 type ExpressionIngestionPayload = {
   expression_day: { title: string; day_date: string; raw_input: string };
@@ -29,7 +29,7 @@ type ExpressionCard = {
 };
 
 type ExpressionDay = { id: string; owner_id: string; day_date: string; title: string; expressions: ExpressionCard[] };
-type QuestionNote = { id: string; question_text: string; status: QuestionStatus };
+type QuestionNote = { id: string; question_text: string; status: QuestionStatus; answer_note: string | null };
 type IngestionRun = { id: string; owner_id: string; status: string };
 
 type ApprovedExpressionDayResult = { expressionDay: ExpressionDay; expressionUrls: string[] };
@@ -44,9 +44,9 @@ type MemoryExpressionStoreInstance = {
   getMemorizationQueue: (options?: { limit?: number }) => Promise<ExpressionCard[]>;
   recordReviewResult: (id: string, result: ReviewResult) => Promise<ExpressionCard>;
   updateExpressionMemo: (id: string, input: { userMemo: string }) => Promise<ExpressionCard>;
-  createQuestionNote: (input: { questionText: string }) => Promise<QuestionNote>;
+  createQuestionNote: (input: { questionText: string; answerNote?: string; status?: QuestionStatus }) => Promise<QuestionNote>;
   listQuestionNotes: () => Promise<QuestionNote[]>;
-  updateQuestionNote: (id: string, input: { status: QuestionStatus }) => Promise<QuestionNote>;
+  updateQuestionNote: (id: string, input: { questionText?: string; answerNote?: string; status?: QuestionStatus }) => Promise<QuestionNote>;
 };
 
 type StoreModule = {
@@ -160,14 +160,23 @@ describe("MemoryExpressionStore daily expression behavior", () => {
     await expect(storeB.updateQuestionNote(question.id, { status: "asked" })).rejects.toThrow("Question note not found");
   });
 
-  it("lists open questions before asked questions and can reopen them", async () => {
+  it("lists open questions before asked and answered questions, and edits received answers", async () => {
     const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
     const store = new MemoryExpressionStore(userA);
     const asked = await store.createQuestionNote({ questionText: "이미 물어본 질문" });
     await store.updateQuestionNote(asked.id, { status: "asked" });
+    const answered = await store.createQuestionNote({ questionText: "답변 받은 질문", answerNote: "초기 답변" });
     const open = await store.createQuestionNote({ questionText: "수업 때 물어볼 질문" });
 
-    expect((await store.listQuestionNotes()).map((note) => note.id)).toEqual([open.id, asked.id]);
+    expect(answered.status).toBe("answered");
+    expect((await store.listQuestionNotes()).map((note) => note.id)).toEqual([open.id, asked.id, answered.id]);
+
+    const updated = await store.updateQuestionNote(answered.id, {
+      questionText: "수정한 질문",
+      answerNote: "수업 답변을 추가로 정리",
+      status: "answered"
+    });
+    expect(updated).toMatchObject({ question_text: "수정한 질문", answer_note: "수업 답변을 추가로 정리", status: "answered" });
 
     const reopened = await store.updateQuestionNote(asked.id, { status: "open" });
     expect(reopened.status).toBe("open");

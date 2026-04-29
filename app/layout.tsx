@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -10,7 +11,7 @@ import { getCurrentUser } from "@/lib/auth";
 
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" }
     ],
@@ -64,15 +66,22 @@ export const viewport: Viewport = {
   themeColor: "#0f766e"
 };
 
-export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+async function UserAwareAppNav() {
   const user = await getCurrentUser();
+  return <AppNav user={user} />;
+}
 
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ko">
       <body className={inter.className}>
         <ServiceWorkerRegistration />
-        <NavigationProgress />
-        <AppNav user={user} />
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
+        <Suspense fallback={<AppNav user={null} />}>
+          <UserAwareAppNav />
+        </Suspense>
         <main className="mx-auto min-h-[calc(100vh-64px)] max-w-3xl px-4 pb-28 pt-6 sm:py-8">{children}</main>
         <Analytics />
         <SpeedInsights />

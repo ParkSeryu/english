@@ -65,10 +65,11 @@ npm run typecheck
 npm test
 npm run build
 npm run test:e2e
+npm run test:perf
 npm run verify:rls
 ```
 
-`npm run verify` runs lint, typecheck, unit/integration/security tests, build, and mobile e2e with runtime cleanup between build and dev-server phases. `npm run verify:all` also runs the Docker-backed local RLS verification.
+`npm run test:perf` runs the Playwright desktop FCP budget check against `/`, `/expressions`, `/memorize`, and `/questions`. The budget is 3,000 ms to match the Vercel Speed Insights "great FCP" cutoff. `npm run verify` runs lint, typecheck, unit/integration/security tests, build, and e2e (including the FCP budget check) with runtime cleanup between build and dev-server phases. `npm run verify:all` also runs the Docker-backed local RLS verification.
 
 Playwright e2e uses a guarded in-memory store only when `E2E_MEMORY_STORE=1` and `E2E_FAKE_USER_ID` are set by the Playwright web server command. This test bypass is disabled when `NODE_ENV=production` and must not be configured in Vercel.
 

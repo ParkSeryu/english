@@ -5,11 +5,11 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth";
-import { flattenZodErrors, parseCardMemoFormData, parseQuestionNoteFormData } from "@/lib/validation";
+import { flattenZodErrors, parseCardMemoFormData, parseQuestionNoteFormData, parseQuestionNoteUpdateFormData } from "@/lib/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getExpressionStore } from "@/lib/lesson-store";
 import { passwordResetRedirectUrl } from "@/lib/site-url";
-import type { ActionState } from "@/lib/types";
+import { QUESTION_NOTE_STATUSES, type ActionState, type QuestionNoteStatus } from "@/lib/types";
 
 function revalidateAppPaths() {
   revalidatePath("/");
@@ -60,11 +60,25 @@ export async function createQuestionNoteAction(_previousState: ActionState, form
   }
 }
 
-export async function updateQuestionStatusAction(questionId: string, status: "open" | "asked") {
+export async function updateQuestionStatusAction(questionId: string, status: QuestionNoteStatus) {
+  if (!QUESTION_NOTE_STATUSES.includes(status)) throw new Error("질문 상태가 올바르지 않습니다.");
   const user = await requireCurrentUser();
   await getExpressionStore(user).updateQuestionNote(questionId, { status });
   revalidateAppPaths();
-  redirect("/questions");
+}
+
+export async function updateQuestionNoteAction(questionId: string, _previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseQuestionNoteUpdateFormData(formData);
+  if (!parsed.success) return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "질문 내용을 확인해 주세요." };
+
+  try {
+    const user = await requireCurrentUser();
+    await getExpressionStore(user).updateQuestionNote(questionId, parsed.data);
+    revalidateAppPaths();
+    return { ok: true, message: "질문거리와 답변 메모를 저장했습니다." };
+  } catch (error) {
+    return errorState(error);
+  }
 }
 
 export async function signInAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {

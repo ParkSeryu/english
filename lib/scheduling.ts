@@ -5,6 +5,20 @@ type MemorizationCandidate = Pick<ExpressionCard, "id" | "unknown_count" | "know
 
 const DEFAULT_LIMIT = 300;
 const MAX_INTERVAL_DAYS = 30;
+const KOREA_TIME_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function koreanDateKey(date: Date) {
+  return new Date(date.getTime() + KOREA_TIME_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function nextKoreanMidnight(now: Date) {
+  const koreaNow = new Date(now.getTime() + KOREA_TIME_OFFSET_MS);
+  return new Date(Date.UTC(koreaNow.getUTCFullYear(), koreaNow.getUTCMonth(), koreaNow.getUTCDate() + 1) - KOREA_TIME_OFFSET_MS);
+}
+
+function isSameKoreanDay(a: Date, b: Date) {
+  return koreanDateKey(a) === koreanDateKey(b);
+}
 
 function timeRank(value: string | null | undefined, fallback: number) {
   if (!value) return fallback;
@@ -27,13 +41,12 @@ function createdRank(card: MemorizationCandidate): number {
 export function isExpressionDue(card: MemorizationCandidate, now = new Date()) {
   if (!card.last_reviewed_at) return true;
 
-  if (!card.due_at) {
-    if (card.last_result !== "known") return true;
-    const lastReviewed = Date.parse(card.last_reviewed_at);
-    if (!Number.isFinite(lastReviewed)) return true;
-    const fallbackIntervalDays = card.interval_days > 0 ? card.interval_days : 1;
-    return lastReviewed + fallbackIntervalDays * 24 * 60 * 60 * 1000 <= now.getTime();
-  }
+  const lastReviewed = new Date(card.last_reviewed_at);
+  if (!Number.isFinite(lastReviewed.getTime())) return true;
+
+  if (card.last_result === "known") return !isSameKoreanDay(lastReviewed, now);
+
+  if (!card.due_at) return true;
 
   const dueAt = Date.parse(card.due_at);
   if (!Number.isFinite(dueAt)) return true;
@@ -52,8 +65,8 @@ export function nextDueAtForUnknown() {
   return null;
 }
 
-export function nextDueAtForKnown(intervalDays: number, now = new Date()) {
-  return new Date(now.getTime() + intervalDays * 24 * 60 * 60 * 1000).toISOString();
+export function nextDueAtForKnown(_intervalDays: number, now = new Date()) {
+  return nextKoreanMidnight(now).toISOString();
 }
 
 export function compareExpressionsForMemorization<T extends MemorizationCandidate>(a: T, b: T) {

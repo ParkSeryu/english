@@ -35,6 +35,12 @@ type SupabaseExpressionDayRow = Omit<ExpressionDay, "expressions"> & {
 };
 
 type SupabaseIngestionRunRow = Omit<IngestionRun, "normalized_payload"> & { normalized_payload: unknown };
+type ExpressionStatsCard = Pick<ExpressionCard, "id" | "known_count" | "unknown_count" | "review_count" | "last_result" | "last_reviewed_at" | "due_at" | "interval_days" | "source_order" | "created_at">;
+type SupabaseExpressionStatsRow = Pick<ExpressionCard, "id" | "known_count" | "unknown_count" | "review_count" | "last_result" | "last_reviewed_at" | "source_order" | "created_at">;
+type QuestionStats = Pick<QuestionNote, "status">;
+
+const EXPRESSION_CARD_COLUMNS = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at";
+const EXPRESSION_STATS_COLUMNS = "id, known_count, unknown_count, review_count, last_result, last_reviewed_at, source_order, created_at";
 
 export interface ExpressionStore {
   listExpressionDays(): Promise<ExpressionDay[]>;
@@ -143,6 +149,21 @@ function applyProgress(card: ExpressionCard, progress?: Partial<ExpressionProgre
   };
 }
 
+function expressionStatsWithProgress(row: SupabaseExpressionStatsRow, progress?: Partial<ExpressionProgress> | null): ExpressionStatsCard {
+  return {
+    id: row.id,
+    known_count: progress?.known_count ?? 0,
+    unknown_count: progress?.unknown_count ?? 0,
+    review_count: progress?.review_count ?? 0,
+    last_result: progress?.last_result ?? null,
+    last_reviewed_at: progress?.last_reviewed_at ?? null,
+    due_at: progress?.due_at ?? null,
+    interval_days: progress?.interval_days ?? 0,
+    source_order: row.source_order,
+    created_at: row.created_at
+  };
+}
+
 function expressionUrl(card: ExpressionCard) {
   return `/expressions/${card.id}`;
 }
@@ -234,21 +255,65 @@ class SupabaseExpressionStore implements ExpressionStore {
     return this.applyUserProgress((data ?? []).map((row: SupabaseExpressionRow) => normalizeExpression(row)));
   }
 
+  private async listExpressionStats() {
+    const supabase = await this.supabase();
+    const { data, error } = await supabase.from("expressions").select(EXPRESSION_STATS_COLUMNS).order("source_order", { ascending: true });
+    if (error) throw error;
+
+    const rows = (data ?? []) as SupabaseExpressionStatsRow[];
+    const progress = await this.progressFor(rows.map((row) => row.id));
+    return rows.map((row) => expressionStatsWithProgress(row, progress.get(row.id)));
+  }
+
+  private async countExpressionDays() {
+    const { count, error } = await (await this.supabase()).from("expression_days").select("id", { count: "exact", head: true });
+    if (error) throw error;
+    return count ?? 0;
+  }
+
+  private async listRecentExpressionDays(limit: number) {
+    if (limit <= 0) return [];
+    const { data, error } = await (await this.supabase())
+      .from("expression_days")
+      .select(`*, expressions(${EXPRESSION_CARD_COLUMNS})`)
+      .order("day_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map((row: SupabaseExpressionDayRow) => {
+      const day = normalizeExpressionDay(row);
+      return { ...day, expressions: day.expressions.map((card) => applyProgress(card, null)) };
+    });
+  }
+
+  private async listQuestionStats() {
+    const { data, error } = await (await this.supabase()).from("question_notes").select("status").eq("owner_id", this.user.id);
+    if (error) throw error;
+    return (data ?? []) as QuestionStats[];
+  }
+
   async getMemorizationQueue(options: { limit?: number } = {}) {
     return scheduleMemorizationQueue(await this.listExpressions(), options.limit ?? 300);
   }
 
   async getDashboardStats() {
-    const [days, expressions, questions] = await Promise.all([this.listExpressionDays(), this.listExpressions(), this.listQuestionNotes()]);
-    return calculateStats(days, expressions, questions);
+    const [dayCount, expressions, questions] = await Promise.all([this.countExpressionDays(), this.listExpressionStats(), this.listQuestionStats()]);
+    return calculateStats(dayCount, expressions, questions);
   }
 
   async getDashboardOverview(options: { queueLimit?: number; recentDayLimit?: number } = {}) {
-    const [days, expressions, questions] = await Promise.all([this.listExpressionDays(), this.listExpressions(), this.listQuestionNotes()]);
+    const queueLimit = options.queueLimit ?? 3;
+    const [dayCount, recentDays, expressions, questions, queueExpressions] = await Promise.all([
+      this.countExpressionDays(),
+      this.listRecentExpressionDays(options.recentDayLimit ?? 3),
+      this.listExpressionStats(),
+      this.listQuestionStats(),
+      queueLimit > 0 ? this.listExpressions() : Promise.resolve([])
+    ]);
     return {
-      stats: calculateStats(days, expressions, questions),
-      recentDays: days.slice(0, options.recentDayLimit ?? 3),
-      queue: scheduleMemorizationQueue(expressions, options.queueLimit ?? 3)
+      stats: calculateStats(dayCount, expressions, questions),
+      recentDays,
+      queue: queueLimit > 0 ? scheduleMemorizationQueue(queueExpressions, queueLimit) : []
     };
   }
 
@@ -317,9 +382,10 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   async createQuestionNote(input: QuestionNoteInput) {
     const timestamp = nowIso();
+    const status = input.status ?? (input.answerNote ? "answered" : "open");
     const { data, error } = await (await this.supabase())
       .from("question_notes")
-      .insert({ owner_id: this.user.id, question_text: input.questionText, answer_note: input.answerNote || null, status: "open", updated_at: timestamp })
+      .insert({ owner_id: this.user.id, question_text: input.questionText, answer_note: input.answerNote || null, status, updated_at: timestamp })
       .select("*")
       .single();
     if (error) throw error;
@@ -524,13 +590,14 @@ export class MemoryExpressionStore implements ExpressionStore {
   }
 
   async getDashboardStats() {
-    return calculateStats(await this.listExpressionDays(), await this.listExpressions(), await this.listQuestionNotes());
+    const [days, expressions, questions] = await Promise.all([this.listExpressionDays(), this.listExpressions(), this.listQuestionNotes()]);
+    return calculateStats(days.length, expressions, questions);
   }
 
   async getDashboardOverview(options: { queueLimit?: number; recentDayLimit?: number } = {}) {
     const [days, expressions, questions] = await Promise.all([this.listExpressionDays(), this.listExpressions(), this.listQuestionNotes()]);
     return {
-      stats: calculateStats(days, expressions, questions),
+      stats: calculateStats(days.length, expressions, questions),
       recentDays: days.slice(0, options.recentDayLimit ?? 3).map(cloneExpressionDay),
       queue: scheduleMemorizationQueue(expressions, options.queueLimit ?? 3).map(cloneExpression)
     };
@@ -584,7 +651,8 @@ export class MemoryExpressionStore implements ExpressionStore {
 
   async createQuestionNote(input: QuestionNoteInput) {
     const timestamp = nowIso();
-    const note: QuestionNote = { id: randomUUID(), owner_id: this.user.id, question_text: input.questionText, answer_note: input.answerNote || null, status: "open", created_at: timestamp, updated_at: timestamp };
+    const status = input.status ?? (input.answerNote ? "answered" : "open");
+    const note: QuestionNote = { id: randomUUID(), owner_id: this.user.id, question_text: input.questionText, answer_note: input.answerNote || null, status, created_at: timestamp, updated_at: timestamp };
     memoryState().questionNotes.unshift(note);
     return { ...note };
   }
@@ -713,14 +781,14 @@ function toDaySummary(day: ExpressionDay): ExpressionDaySummary {
   return { id: day.id, title: day.title, source_note: day.source_note, day_date: day.day_date };
 }
 
-function calculateStats(days: ExpressionDay[], expressions: ExpressionCard[], questions: QuestionNote[]): DashboardStats {
+function calculateStats(dayCount: number, expressions: ExpressionStatsCard[], questions: QuestionStats[]): DashboardStats {
   return {
     total: expressions.length,
     knownReviews: expressions.reduce((sum, card) => sum + card.known_count, 0),
     unknownReviews: expressions.reduce((sum, card) => sum + card.unknown_count, 0),
     unseenCount: expressions.filter((card) => !card.last_reviewed_at).length,
     dueCount: scheduleMemorizationQueue(expressions, 300).length,
-    dayCount: days.length,
+    dayCount,
     questionCount: questions.length,
     openQuestionCount: questions.filter((note) => note.status === "open").length
   };

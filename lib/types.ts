@@ -84,7 +84,8 @@ export type ExpressionProgress = {
   updated_at: string;
 };
 
-export type QuestionNoteStatus = "open" | "asked";
+export const QUESTION_NOTE_STATUSES = ["open", "asked", "answered"] as const;
+export type QuestionNoteStatus = (typeof QUESTION_NOTE_STATUSES)[number];
 
 export type QuestionNote = {
   id: string;
@@ -141,7 +142,8 @@ export type CardMemoInput = {
 
 export type QuestionNoteInput = {
   questionText: string;
-  answerNote?: string;
+  answerNote?: string | null;
+  status?: QuestionNoteStatus;
 };
 
 export type DashboardStats = {

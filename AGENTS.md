@@ -19,6 +19,12 @@ This repo follows the workspace-level OMX/autonomous-agent instructions. The fol
 - Only target `main` when the user explicitly instructs to put the work on `main`; otherwise keep integration directed at `dev`.
 - Before any merge/push handoff, state the source branch/worktree and confirm the target branch is `dev`.
 
+## Local dev server access
+
+- When the user asks to run, open, or restart the dev server, bind it to `0.0.0.0` unless they explicitly request localhost-only.
+- Verify both local and external-IP access when possible: `http://127.0.0.1:3000/` and the machine's reachable LAN/WSL/container IP such as `http://172.22.48.149:3000/`.
+- Do not report the server as open if it only listens on `127.0.0.1` and the user is expected to access it from an external IP.
+
 ## Mandatory end-of-task working gate
 
 Before reporting any implementation, UI, route, server action, schema, or runtime-affecting task as complete:

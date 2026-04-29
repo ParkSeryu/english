@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nextKnownIntervalDays, scheduleMemorizationQueue } from "@/lib/scheduling";
+import { nextDueAtForKnown, nextKnownIntervalDays, scheduleMemorizationQueue } from "@/lib/scheduling";
 import type { ExpressionCard } from "@/lib/types";
 
 function card(overrides: Partial<ExpressionCard>): ExpressionCard {
@@ -72,7 +72,7 @@ describe("scheduleMemorizationQueue", () => {
   });
 
 
-  it("keeps remembered cards without due_at out until their fallback interval passes", () => {
+  it("keeps remembered cards reviewed today out until Korean midnight", () => {
     const queue = scheduleMemorizationQueue(
       [
         card({ id: "remembered", known_count: 1, last_result: "known", last_reviewed_at: "2026-04-28T11:30:00.000Z", due_at: null, interval_days: 1 }),
@@ -82,6 +82,18 @@ describe("scheduleMemorizationQueue", () => {
       now
     );
     expect(queue.map((candidate) => candidate.id)).toEqual(["forgotten"]);
+  });
+
+  it("brings remembered cards back immediately after Korean midnight", () => {
+    const queue = scheduleMemorizationQueue(
+      [
+        card({ id: "remembered-yesterday-night", known_count: 1, last_result: "known", last_reviewed_at: "2026-04-28T14:50:00.000Z", due_at: null, interval_days: 1 }),
+        card({ id: "remembered-after-midnight", known_count: 1, last_result: "known", last_reviewed_at: "2026-04-28T15:00:30.000Z", due_at: null, interval_days: 1 })
+      ],
+      10,
+      new Date("2026-04-28T15:01:00.000Z")
+    );
+    expect(queue.map((candidate) => candidate.id)).toEqual(["remembered-yesterday-night"]);
   });
 
   it("uses source order as the final stable tie-breaker", () => {
@@ -95,6 +107,11 @@ describe("scheduleMemorizationQueue", () => {
     expect(nextKnownIntervalDays(3)).toBe(7);
     expect(nextKnownIntervalDays(7)).toBe(14);
     expect(nextKnownIntervalDays(30)).toBe(30);
+  });
+
+  it("sets remembered cards due at the next Korean midnight", () => {
+    expect(nextDueAtForKnown(30, new Date("2026-04-28T14:50:00.000Z"))).toBe("2026-04-28T15:00:00.000Z");
+    expect(nextDueAtForKnown(1, new Date("2026-04-28T15:01:00.000Z"))).toBe("2026-04-29T15:00:00.000Z");
   });
 
   it("keeps queues small and configurable", () => {

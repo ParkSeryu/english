@@ -19,7 +19,7 @@ export function QuestionNoteForm() {
       </div>
       <div>
         <label className="label" htmlFor="answerNote">답변 메모 (선택)</label>
-        <textarea id="answerNote" name="answerNote" rows={3} className="input min-h-24" placeholder="이미 받은 답변이나 힌트" />
+        <textarea id="answerNote" name="answerNote" rows={3} className="input min-h-24" placeholder="이미 답변을 받았거나 힌트가 있으면 적어두세요" />
         <FieldError messages={state.fieldErrors?.answerNote} />
       </div>
       {state.message ? <p className={`rounded-2xl p-3 text-sm font-medium ${state.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{state.message}</p> : null}
