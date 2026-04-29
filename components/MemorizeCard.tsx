@@ -69,29 +69,36 @@ function GrammarPatternNote({ body }: { body: string }) {
 
     if (labeledLine) {
       const [, starPrefix, label, rest] = labeledLine;
-      const separatedMeaning = rest.match(/^(\s*)(.*?) = (.*)$/u);
 
       return (
         <Fragment key={`${index}-${line}`}>
           {lineBreak}
           {starPrefix}
           <strong className="rounded-full bg-teal-100 px-2 py-0.5 font-black text-teal-800">{label}</strong>
-          {separatedMeaning ? (
-            <>
-              {separatedMeaning[1]}
-              <span className="inline-flex flex-wrap items-center gap-1.5 align-baseline">
-                <span>{separatedMeaning[2]}</span>
-                <span className="inline-flex rounded-full bg-slate-200 px-1.5 py-0.5 text-xs font-black leading-none text-slate-500" aria-label="뜻">
-                  →
-                </span>
-                <span>{separatedMeaning[3]}</span>
-              </span>
-            </>
-          ) : rest}
+          {renderMeaningSeparator(rest)}
         </Fragment>
       );
     }
 
-    return <Fragment key={`${index}-${line}`}>{lineBreak}{line}</Fragment>;
+    return <Fragment key={`${index}-${line}`}>{lineBreak}{renderMeaningSeparator(line)}</Fragment>;
   });
+}
+
+function renderMeaningSeparator(text: string) {
+  const separatedMeaning = text.match(/^(\s*)(.*?) = (.*)$/u);
+
+  if (!separatedMeaning) return text;
+
+  return (
+    <>
+      {separatedMeaning[1]}
+      <span className="inline-flex flex-wrap items-center gap-1.5 align-baseline">
+        <span>{separatedMeaning[2]}</span>
+        <span className="inline-flex rounded-full bg-slate-200 px-1.5 py-0.5 text-xs font-black leading-none text-slate-500" aria-label="뜻">
+          →
+        </span>
+        <span>{separatedMeaning[3]}</span>
+      </span>
+    </>
+  );
 }
