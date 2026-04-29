@@ -113,4 +113,29 @@ describe("MemorizeCard", () => {
     expect(screen.queryByText(expression.english)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /정답 보기/ })).toBeInTheDocument();
   });
+
+  it("preserves leading star text while highlighting grammar and pattern labels", async () => {
+    const user = userEvent.setup();
+    const { MemorizeCard } = await importModule<MemorizeCardModule>("@/components/MemorizeCard");
+    const grammarNote = "★★★ 문법: be used to + 명사/-ing = ~에 익숙하다\n  ★★★ 패턴: used to + 동사원형 = 예전에 ~하곤 했다";
+
+    render(<MemorizeCard expression={{ ...expression, grammar_note: grammarNote }} />);
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+
+    const noteSection = screen.getByRole("heading", { name: "문법/패턴" }).closest("section");
+    expect(noteSection).not.toBeNull();
+
+    const labels = within(noteSection as HTMLElement).getAllByText(/^(문법:|패턴:)$/);
+    expect(labels).toHaveLength(2);
+    expect(labels.every((label) => label.tagName.toLowerCase() === "strong")).toBe(true);
+    expect(within(noteSection as HTMLElement).queryByText("✦")).not.toBeInTheDocument();
+    expect(noteSection).toHaveTextContent("★★★");
+    expect(noteSection).toHaveTextContent("be used to + 명사/-ing");
+    expect(noteSection).toHaveTextContent("~에 익숙하다");
+    expect(noteSection).toHaveTextContent("used to + 동사원형");
+    expect(noteSection).toHaveTextContent("예전에 ~하곤 했다");
+    expect(noteSection).toHaveTextContent("→");
+    expect(noteSection).not.toHaveTextContent(" = ");
+  });
 });

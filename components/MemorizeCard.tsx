@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import { recordExpressionReviewAction } from "@/app/actions";
 import type { ExpressionCard } from "@/lib/types";
@@ -32,7 +33,7 @@ export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ??
             <p className="whitespace-pre-wrap text-lg font-semibold leading-7 text-slate-100">{expression.korean_prompt}</p>
           </div>
           <div className="mt-5 space-y-4" aria-live="polite">
-            {expression.grammar_note ? <Info title="문법/패턴" body={expression.grammar_note} /> : null}
+            {expression.grammar_note ? <Info title="문법/패턴" body={<GrammarPatternNote body={expression.grammar_note} />} /> : null}
             {expression.examples.length > 0 ? (
               <section className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
                 <h2 className="text-sm font-black uppercase tracking-wide text-slate-500">비슷한 표현</h2>
@@ -57,6 +58,40 @@ export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ??
   );
 }
 
-function Info({ title, body }: { title: string; body: string }) {
-  return <section className="rounded-3xl border border-slate-100 bg-slate-50 p-4"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">{title}</h2><p className="mt-2 whitespace-pre-wrap text-base leading-7 text-slate-700">{body}</p></section>;
+function Info({ title, body }: { title: string; body: ReactNode }) {
+  return <section className="rounded-3xl border border-slate-100 bg-slate-50 p-4"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">{title}</h2><div className="mt-2 whitespace-pre-wrap text-base leading-7 text-slate-700">{body}</div></section>;
+}
+
+function GrammarPatternNote({ body }: { body: string }) {
+  return body.split("\n").map((line, index) => {
+    const labeledLine = line.match(/^([\s★]*)(문법:|패턴:)(.*)$/u);
+    const lineBreak = index > 0 ? "\n" : null;
+
+    if (labeledLine) {
+      const [, starPrefix, label, rest] = labeledLine;
+      const separatedMeaning = rest.match(/^(\s*)(.*?) = (.*)$/u);
+
+      return (
+        <Fragment key={`${index}-${line}`}>
+          {lineBreak}
+          {starPrefix}
+          <strong className="rounded-full bg-teal-100 px-2 py-0.5 font-black text-teal-800">{label}</strong>
+          {separatedMeaning ? (
+            <>
+              {separatedMeaning[1]}
+              <span className="inline-flex flex-wrap items-center gap-1.5 align-baseline">
+                <span>{separatedMeaning[2]}</span>
+                <span className="inline-flex rounded-full bg-slate-200 px-1.5 py-0.5 text-xs font-black leading-none text-slate-500" aria-label="뜻">
+                  →
+                </span>
+                <span>{separatedMeaning[3]}</span>
+              </span>
+            </>
+          ) : rest}
+        </Fragment>
+      );
+    }
+
+    return <Fragment key={`${index}-${line}`}>{lineBreak}{line}</Fragment>;
+  });
 }
