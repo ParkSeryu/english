@@ -8,6 +8,7 @@ import { requireCurrentUser } from "@/lib/auth";
 import { flattenZodErrors, parseCardMemoFormData, parseQuestionNoteFormData } from "@/lib/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getExpressionStore } from "@/lib/lesson-store";
+import { passwordResetRedirectUrl } from "@/lib/site-url";
 import type { ActionState } from "@/lib/types";
 
 function revalidateAppPaths() {
@@ -106,10 +107,9 @@ export async function resetPasswordAction(_previousState: ActionState, formData:
 
   try {
     const headerStore = await headers();
-    const origin = headerStore.get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL;
     const supabase = await createServerSupabaseClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: origin ? `${origin}/auth/callback?next=/login` : undefined
+      redirectTo: passwordResetRedirectUrl(headerStore)
     });
     if (error) return { ok: false, message: error.message };
   } catch (error) {

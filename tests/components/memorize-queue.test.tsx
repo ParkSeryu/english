@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -44,6 +45,7 @@ describe("MemorizeQueue", () => {
 
   beforeEach(() => {
     reviewAction.mockClear();
+    window.sessionStorage.clear();
   });
 
   it("optimistically advances to the next expression as soon as a review button is submitted", async () => {
@@ -77,6 +79,81 @@ describe("MemorizeQueue", () => {
 
     expect(reviewAction).toHaveBeenNthCalledWith(2, second.id, "unknown", "/memorize?defer=expression-1%2Cexpression-2", expect.any(FormData));
     expect(screen.getByText("세 번째 한국어")).toBeInTheDocument();
+  });
+
+  it("updates the remaining count optimistically only after remembered reviews", async () => {
+    const user = userEvent.setup();
+    render(<MemorizeQueue expressions={[first, second, third]} />);
+
+    expect(screen.getByText("복습할 표현 3개")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+
+    expect(screen.getByText("복습할 표현 3개")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /외웠음/ }));
+
+    expect(screen.getByText("복습할 표현 2개")).toBeInTheDocument();
+  });
+
+
+
+  it("server-renders a preparation state before browser storage can restore the queue", () => {
+    const html = renderToString(<MemorizeQueue expressions={[first, second, third]} />);
+
+    expect(html).toContain("복습 준비 중…");
+    expect(html).not.toContain("첫 번째 한국어");
+  });
+
+  it("restores the stored queue position after mounting", async () => {
+    window.sessionStorage.setItem(
+      "english:memorize-session:v1",
+      JSON.stringify({
+        queueIds: [second.id, third.id, first.id],
+        activeId: second.id,
+        deferredIds: [first.id]
+      })
+    );
+
+    render(<MemorizeQueue expressions={[first, second, third]} />);
+
+    await waitFor(() => expect(screen.getByText("두 번째 한국어")).toBeInTheDocument());
+    expect(screen.queryByText("첫 번째 한국어")).not.toBeInTheDocument();
+    expect(screen.queryByText("복습 준비 중…")).not.toBeInTheDocument();
+  });
+
+  it("restores the current queue position from sessionStorage after remount", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<MemorizeQueue expressions={[first, second, third]} />);
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+    await waitFor(() => expect(window.sessionStorage.getItem("english:memorize-session:v1")).toContain(second.id));
+
+    unmount();
+    render(<MemorizeQueue expressions={[first, second, third]} />);
+
+    await waitFor(() => expect(screen.getByText("두 번째 한국어")).toBeInTheDocument());
+    expect(screen.queryByText("첫 번째 한국어")).not.toBeInTheDocument();
+  });
+
+  it("drops stale stored cards that are no longer in the server queue", async () => {
+    window.sessionStorage.setItem(
+      "english:memorize-session:v1",
+      JSON.stringify({
+        queueIds: [second.id, third.id, first.id],
+        activeId: second.id,
+        deferredIds: [first.id]
+      })
+    );
+
+    render(<MemorizeQueue expressions={[third, first]} deferredIds={[first.id]} />);
+
+    await waitFor(() => expect(screen.getByText("세 번째 한국어")).toBeInTheDocument());
+    expect(screen.queryByText("두 번째 한국어")).not.toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem("english:memorize-session:v1")).not.toContain(second.id));
   });
 
   it("uses the first expression from a refreshed deferred queue instead of carrying over the old active index", async () => {

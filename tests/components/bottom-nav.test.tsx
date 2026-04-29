@@ -26,13 +26,15 @@ vi.mock("next/link", () => ({
 import { BottomNav } from "@/components/BottomNav";
 
 describe("BottomNav", () => {
-  it("shows immediate pending feedback when tapping another navigation item", () => {
+  it("keeps stable tab labels and marks the current route", () => {
     render(<BottomNav />);
 
     expect(screen.getByRole("link", { name: "표현" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "암기" })).toHaveAttribute("href", "/memorize");
 
     fireEvent.click(screen.getByRole("link", { name: "암기" }));
 
-    expect(screen.getByRole("link", { name: "이동 중…" })).toHaveAttribute("href", "/memorize");
+    expect(screen.getByRole("link", { name: "암기" })).toHaveAttribute("href", "/memorize");
+    expect(screen.queryByRole("link", { name: "이동 중…" })).not.toBeInTheDocument();
   });
 });

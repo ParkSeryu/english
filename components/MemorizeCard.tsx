@@ -13,8 +13,8 @@ export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ??
   return (
     <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-card">
       <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-500">
-        <span>틀림 {expression.unknown_count}회</span>
         <span>외움 {expression.known_count}회</span>
+        <span>틀림 {expression.unknown_count}회</span>
       </div>
 
       {!revealed ? (

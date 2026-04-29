@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -76,6 +76,10 @@ describe("MemorizeCard", () => {
     render(<MemorizeCard expression={expression} />);
 
     expect(screen.getByText(expression.korean_prompt)).toBeInTheDocument();
+
+    const counters = screen.getByText("외움 1회").parentElement;
+    expect(counters).not.toBeNull();
+    expect(within(counters as HTMLElement).getAllByText(/회$/).map((node) => node.textContent)).toEqual(["외움 1회", "틀림 2회"]);
     expect(screen.queryByText(expression.english)).not.toBeInTheDocument();
     expect(screen.queryByText(expression.grammar_note ?? "")).not.toBeInTheDocument();
 
@@ -91,6 +95,9 @@ describe("MemorizeCard", () => {
     expect(screen.queryByText(expression.structure_note ?? "")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /외웠음/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /모름/ })).toBeInTheDocument();
+
+    const reviewButtons = screen.getAllByRole("button").filter((button) => ["외웠음", "모름"].includes(button.textContent ?? ""));
+    expect(reviewButtons.map((button) => button.textContent)).toEqual(["모름", "외웠음"]);
   });
 
   it("hides the answer again after marking an expression unknown", async () => {
