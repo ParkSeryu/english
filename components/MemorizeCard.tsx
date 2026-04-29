@@ -64,7 +64,7 @@ function Info({ title, body }: { title: string; body: ReactNode }) {
 
 function GrammarPatternNote({ body }: { body: string }) {
   return body.split("\n").map((line, index) => {
-    const labeledLine = line.match(/^([\s★]*)(문법:|패턴:)(.*)$/u);
+    const labeledLine = line.match(/^([\s★]*)(문법|패턴):(.*)$/u);
     const lineBreak = index > 0 ? "\n" : null;
 
     if (labeledLine) {

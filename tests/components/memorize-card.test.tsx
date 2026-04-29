@@ -126,9 +126,11 @@ describe("MemorizeCard", () => {
     const noteSection = screen.getByRole("heading", { name: "문법/패턴" }).closest("section");
     expect(noteSection).not.toBeNull();
 
-    const labels = within(noteSection as HTMLElement).getAllByText(/^(문법:|패턴:)$/);
+    const labels = within(noteSection as HTMLElement).getAllByText(/^(문법|패턴)$/);
     expect(labels).toHaveLength(2);
     expect(labels.every((label) => label.tagName.toLowerCase() === "strong")).toBe(true);
+    expect(noteSection).not.toHaveTextContent("문법:");
+    expect(noteSection).not.toHaveTextContent("패턴:");
     expect(within(noteSection as HTMLElement).queryByText("✦")).not.toBeInTheDocument();
     expect(noteSection).toHaveTextContent("★★★");
     expect(noteSection).toHaveTextContent("be used to + 명사/-ing");
