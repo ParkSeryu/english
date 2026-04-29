@@ -42,6 +42,11 @@ export interface ExpressionStore {
   getExpression(id: string): Promise<ExpressionCard | null>;
   getMemorizationQueue(options?: { limit?: number }): Promise<ExpressionCard[]>;
   getDashboardStats(): Promise<DashboardStats>;
+  getDashboardOverview(options?: { queueLimit?: number; recentDayLimit?: number }): Promise<{
+    stats: DashboardStats;
+    recentDays: ExpressionDay[];
+    queue: ExpressionCard[];
+  }>;
   recordReviewResult(id: string, result: "known" | "unknown"): Promise<ExpressionCard>;
   updateExpressionMemo(id: string, input: CardMemoInput): Promise<ExpressionCard>;
   listQuestionNotes(): Promise<QuestionNote[]>;
@@ -212,6 +217,15 @@ class SupabaseExpressionStore implements ExpressionStore {
   async getDashboardStats() {
     const [days, expressions, questions] = await Promise.all([this.listExpressionDays(), this.listExpressions(), this.listQuestionNotes()]);
     return calculateStats(days, expressions, questions);
+  }
+
+  async getDashboardOverview(options: { queueLimit?: number; recentDayLimit?: number } = {}) {
+    const [days, expressions, questions] = await Promise.all([this.listExpressionDays(), this.listExpressions(), this.listQuestionNotes()]);
+    return {
+      stats: calculateStats(days, expressions, questions),
+      recentDays: days.slice(0, options.recentDayLimit ?? 3),
+      queue: scheduleMemorizationQueue(expressions, options.queueLimit ?? 3)
+    };
   }
 
   async recordReviewResult(id: string, result: "known" | "unknown") {
@@ -461,6 +475,15 @@ export class MemoryExpressionStore implements ExpressionStore {
 
   async getDashboardStats() {
     return calculateStats(await this.listExpressionDays(), await this.listExpressions(), await this.listQuestionNotes());
+  }
+
+  async getDashboardOverview(options: { queueLimit?: number; recentDayLimit?: number } = {}) {
+    const [days, expressions, questions] = await Promise.all([this.listExpressionDays(), this.listExpressions(), this.listQuestionNotes()]);
+    return {
+      stats: calculateStats(days, expressions, questions),
+      recentDays: days.slice(0, options.recentDayLimit ?? 3).map(cloneExpressionDay),
+      queue: scheduleMemorizationQueue(expressions, options.queueLimit ?? 3).map(cloneExpression)
+    };
   }
 
   async recordReviewResult(id: string, result: "known" | "unknown") {

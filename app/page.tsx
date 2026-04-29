@@ -24,8 +24,7 @@ export default async function DashboardPage() {
   }
 
   const store = getExpressionStore(user);
-  const [stats, days, queue] = await Promise.all([store.getDashboardStats(), store.listExpressionDays(), store.getMemorizationQueue({ limit: 3 })]);
-  const recentDays = days.slice(0, 3);
+  const { stats, recentDays, queue } = await store.getDashboardOverview({ queueLimit: 3, recentDayLimit: 3 });
 
   return (
     <div className="space-y-6">
