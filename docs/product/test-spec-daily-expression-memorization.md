@@ -29,7 +29,7 @@ Implementation is complete only when:
 | Approval gate | Unit/integration/security | Non-approval feedback does not insert; explicit approval inserts or publishes one approved expression day; drafts are not learner-visible. |
 | Store insertion | Integration | Expression day and expressions are inserted together as shared content; per-user progress starts empty. |
 | Memorization reveal | Component/e2e | Korean is visible before reveal; English hidden until `정답 보기`. |
-| Review result state | Integration | `모름` increments cumulative `unknown_count`, resets `interval_days` to 0, and sets a same-day `due_at`; `외웠음` increments cumulative `known_count`, increases `interval_days`, sets future `due_at`, and both update `review_count`. |
+| Review result state | Integration | `모름` increments cumulative `unknown_count`, resets `interval_days` to 0, keeps `due_at` immediately due, and defers the card to the back of the current session; `외웠음` increments cumulative `known_count`, increases `interval_days`, sets future `due_at`, and both update `review_count`. |
 | Queue priority | Unit/integration | Only new/due cards appear; higher unknown count appears before lower unknown/known-heavy due items; future-due known cards are excluded until `due_at`. |
 | Grammar point | Component/e2e | Point displays after reveal/detail but is not the primary prompt. |
 | Question notes | Integration/e2e | Add question, optionally link it to an expression/day, list open first, mark asked, reopen. |
@@ -60,7 +60,7 @@ Implementation is complete only when:
 
 ### AC-004 — Unknown-weighted queue improves memorization
 
-- `모름` increments cumulative `unknown_count`, sets `last_result = unknown`, resets `interval_days` to 0, and schedules `due_at` later the same day.
+- `모름` increments cumulative `unknown_count`, sets `last_result = unknown`, resets `interval_days` to 0, keeps the card immediately due, and defers it to the back of the active session.
 - Higher cumulative `unknown_count` due cards rank ahead of lower-priority cards.
 - `외웠음` increments cumulative `known_count`, sets `last_result = known`, advances intervals 1 → 3 → 7 → 14 → max 30 days, and excludes the card until `due_at`.
 - Future-due cards do not appear in the memorize queue; never-reviewed cards are immediately due.

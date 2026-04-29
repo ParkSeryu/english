@@ -71,6 +71,19 @@ describe("scheduleMemorizationQueue", () => {
     expect(queue.map((candidate) => candidate.id)).toEqual(["never", "known-once", "known-many"]);
   });
 
+
+  it("keeps remembered cards without due_at out until their fallback interval passes", () => {
+    const queue = scheduleMemorizationQueue(
+      [
+        card({ id: "remembered", known_count: 1, last_result: "known", last_reviewed_at: "2026-04-28T11:30:00.000Z", due_at: null, interval_days: 1 }),
+        card({ id: "forgotten", unknown_count: 1, last_result: "unknown", last_reviewed_at: "2026-04-28T11:30:00.000Z", due_at: null, interval_days: 0 })
+      ],
+      10,
+      now
+    );
+    expect(queue.map((candidate) => candidate.id)).toEqual(["forgotten"]);
+  });
+
   it("uses source order as the final stable tie-breaker", () => {
     const queue = scheduleMemorizationQueue([card({ id: "second", source_order: 2 }), card({ id: "first", source_order: 1 })], 10, now);
     expect(queue.map((candidate) => candidate.id)).toEqual(["first", "second"]);
@@ -85,7 +98,8 @@ describe("scheduleMemorizationQueue", () => {
   });
 
   it("keeps queues small and configurable", () => {
-    const cards = Array.from({ length: 12 }, (_, index) => card({ id: String(index), source_order: index }));
+    const cards = Array.from({ length: 312 }, (_, index) => card({ id: String(index), source_order: index }));
     expect(scheduleMemorizationQueue(cards, 5, now)).toHaveLength(5);
+    expect(scheduleMemorizationQueue(cards, undefined, now)).toHaveLength(300);
   });
 });

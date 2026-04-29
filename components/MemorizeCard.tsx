@@ -5,16 +5,16 @@ import { useMemo, useState } from "react";
 import { recordExpressionReviewAction } from "@/app/actions";
 import type { ExpressionCard } from "@/lib/types";
 
-export function MemorizeCard({ expression, returnTo = "/memorize", onReviewSubmit }: { expression: ExpressionCard; returnTo?: string; onReviewSubmit?: () => void }) {
+export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ?? "/memorize", unknownReturnTo = returnTo ?? "/memorize", onReviewSubmit }: { expression: ExpressionCard; returnTo?: string; knownReturnTo?: string; unknownReturnTo?: string; onReviewSubmit?: (result: "known" | "unknown") => void }) {
   const [revealed, setRevealed] = useState(false);
-  const knownAction = useMemo(() => recordExpressionReviewAction.bind(null, expression.id, "known", returnTo), [expression.id, returnTo]);
-  const unknownAction = useMemo(() => recordExpressionReviewAction.bind(null, expression.id, "unknown", returnTo), [expression.id, returnTo]);
+  const knownAction = useMemo(() => recordExpressionReviewAction.bind(null, expression.id, "known", knownReturnTo), [expression.id, knownReturnTo]);
+  const unknownAction = useMemo(() => recordExpressionReviewAction.bind(null, expression.id, "unknown", unknownReturnTo), [expression.id, unknownReturnTo]);
 
   return (
     <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-card">
       <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-500">
+        <span>틀림 {expression.unknown_count}회</span>
         <span>외움 {expression.known_count}회</span>
-        <span>모름 {expression.unknown_count}회</span>
       </div>
 
       {!revealed ? (
@@ -48,8 +48,8 @@ export function MemorizeCard({ expression, returnTo = "/memorize", onReviewSubmi
               </section>
             ) : null}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form action={unknownAction} onSubmit={() => { setRevealed(false); onReviewSubmit?.(); }}><button type="submit" className="min-h-14 w-full rounded-full bg-red-500 px-5 py-3 font-black text-white shadow-lg shadow-red-100 transition hover:bg-red-600">모름</button></form>
-              <form action={knownAction} onSubmit={onReviewSubmit}><button type="submit" className="min-h-14 w-full rounded-full bg-emerald-600 px-5 py-3 font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700">외웠음</button></form>
+              <form action={unknownAction} onSubmit={() => { setRevealed(false); onReviewSubmit?.("unknown"); }}><button type="submit" className="min-h-14 w-full rounded-full bg-red-500 px-5 py-3 font-black text-white shadow-lg shadow-red-100 transition hover:bg-red-600">모름</button></form>
+              <form action={knownAction} onSubmit={() => onReviewSubmit?.("known")}><button type="submit" className="min-h-14 w-full rounded-full bg-emerald-600 px-5 py-3 font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700">외웠음</button></form>
             </div>
           </div>
         </>

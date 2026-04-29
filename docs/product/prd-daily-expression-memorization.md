@@ -85,7 +85,7 @@ Each expression card supports:
 - After reveal, user chooses:
   - `외웠음`
   - `모름`
-- `모름` marks the current learner's latest state as unknown, increments cumulative `unknown_count`, resets `interval_days` to 0, and schedules the card to return later the same day (`due_at = now + 10 minutes`).
+- `모름` marks the current learner's latest state as unknown, increments cumulative `unknown_count`, resets `interval_days` to 0, keeps `due_at` null/immediately due, and the active review session moves the card to the back until it is remembered.
 - `외웠음` marks the current learner's latest state as known, increments cumulative `known_count`, increases the successful-review interval, and schedules the next review by `due_at`.
 
 ### MVP review scheduling
@@ -94,7 +94,7 @@ MVP uses a simple two-button Anki-lite scheduler instead of the full Anki algori
 
 1. Only new cards or cards with `due_at <= now` appear in the memorize queue.
 2. New/never-reviewed cards are immediately due.
-3. `모름` returns the card later the same day and keeps it high priority through cumulative `unknown_count`.
+3. `모름` keeps the card due, moves it to the back of the current session, and keeps it high priority in future queues through cumulative `unknown_count`.
 4. `외웠음` uses successful-review intervals: 1 day → 3 days → 7 days → 14 days → up to 30 days.
 5. Due cards are ordered by higher `unknown_count`, never-reviewed state, older `due_at`, lower `known_count`, least-recent review, then original order.
 
@@ -274,7 +274,7 @@ Reuse or adapt the existing ingestion run concept, but `normalized_payload` shou
 2. No expression day is saved before explicit approval.
 3. The app shows date-based expression days.
 4. Memorization shows Korean first and hides English before reveal.
-5. `모름` increments cumulative `unknown_count`, resets the interval, and schedules a same-day retry.
+5. `모름` increments cumulative `unknown_count`, resets the interval, keeps the card due, and moves it to the back of the current session until remembered.
 6. `외웠음` increments cumulative `known_count`, increases the interval, and schedules the next due date.
 7. Grammar points display as hints/support after reveal or detail.
 8. Questions tab lets the user add and mark class questions.

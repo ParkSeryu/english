@@ -35,7 +35,7 @@ Rebuild the current lesson-oriented app into a daily expression memorization app
 - Replace status scheduling with due-based Anki-lite queue:
   - new or `due_at <= now` only,
   - higher cumulative unknown count first,
-  - same-day retry after `모름`,
+  - current-session back-of-queue retry after `모름`,
   - 1/3/7/14+ day intervals after `외웠음`,
   - least recently reviewed and source order as tie-breakers.
 
@@ -95,7 +95,7 @@ The repository still reflects the previous lesson/review MVP in the worker basel
 
 - `lib/types.ts` is still centered on `Lesson`, `StudyItem`, lesson examples, and status values (`new`, `learning`, `memorized`, `confusing`). The new domain types should be introduced as the primary app contract instead of adapting the old status model.
 - `lib/validation.ts` currently validates lesson ingestion payloads and only accepts `YYYY-MM-DD` dates. It needs an expression-day schema with compact-date normalization for `260427`, `20260427`, and already-normalized `YYYY-MM-DD` inputs.
-- `lib/scheduling.ts` currently orders by legacy status. Replace this with a two-button Anki-lite expression queue: new/due cards only, cumulative `unknown_count` priority, same-day retry after `모름`, and successful intervals of 1/3/7/14+ days after `외웠음`.
+- `lib/scheduling.ts` currently orders by legacy status. Replace this with a two-button Anki-lite expression queue: new/due cards only, cumulative `unknown_count` priority, current-session back-of-queue retry after `모름`, and successful intervals of 1/3/7/14+ days after `외웠음`.
 - `lib/lesson-store.ts` mixes persistence, ingestion approval, review updates, and memory test state for lesson records. Rename or replace it with an `ExpressionStore` surface so UI and tests no longer depend on lesson terminology for the new path.
 - `components/AppNav.tsx` is a top header with `레슨` and `복습`; the MVP requires a mobile bottom GNB containing `표현`, `암기`, and `질문거리`, with Questions always reachable.
 - Existing pages under `/lessons`, `/items`, `/review`, and `/cards` can remain as redirects/rollback affordances, but the primary routes must be `/expression-days`, `/expression-days/[id]`, `/expressions/[id]`, `/memorize`, and `/questions`.
@@ -164,7 +164,7 @@ Before final integration, verify all of the following against the PRD and test s
 - [x] Explicit approval inserts exactly one expression day with its expressions for the configured owner.
 - [x] Non-approval Korean feedback such as `좋네`, `괜찮아`, or `이 문장 자연스러워?` does not insert.
 - [x] Memorization starts Korean-first and hides English until reveal.
-- [x] `모름` increments cumulative `unknown_count`, resets interval, and schedules a same-day retry; `외웠음` increments cumulative `known_count`, advances interval, and hides the card until `due_at`; both increment `review_count`.
+- [x] `모름` increments cumulative `unknown_count`, resets interval, and schedules a back-of-session retry until remembered; `외웠음` increments cumulative `known_count`, advances interval, and hides the card until `due_at`; both increment `review_count`.
 - [x] Queue includes only new/due cards and visibly favors higher cumulative `unknown_count` among due cards.
 - [x] Questions bottom tab supports quick add, asked, reopen, and open-first sorting.
 - [x] RLS denies anon access, allows shared expression reads to authenticated users, and keeps progress/questions user-scoped.
@@ -203,7 +203,7 @@ $team 3:executor "Implement docs/product/implementation-plan-daily-expression-me
 
 - Daily expression days replace lesson UI as the primary app path at `/expression-days`.
 - Memorization uses Korean prompt → hidden English → reveal.
-- `모름` increments the learner's cumulative unknown counter, schedules a same-day retry, and affects due-card priority.
+- `모름` increments the learner's cumulative unknown counter, keeps the card due, moves it behind the remaining current-session cards, and affects due-card priority.
 - Questions tab supports quick add/asked/reopen.
 - LLM ingestion saves only after explicit approval.
 - Full verification passes.

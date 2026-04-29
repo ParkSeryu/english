@@ -36,8 +36,8 @@ export default async function DashboardPage() {
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="표현" value={stats.total} />
           <StatCard label="미확인" value={stats.unseenCount} />
-          <StatCard label="외움" value={stats.knownReviews} />
-          <StatCard label="모름" value={stats.unknownReviews} />
+          <StatCard label="오늘 복습" value={stats.dueCount} />
+          <StatCard label="질문" value={stats.openQuestionCount} />
         </div>
       </section>
 
@@ -52,10 +52,10 @@ export default async function DashboardPage() {
 
       {recentDays.length > 0 ? (
         <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-black text-ink">최근 표현 묶음</h2><Link href="/expressions" className="text-sm font-bold text-teal-700">전체 보기</Link></div>
+          <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-black text-ink">최근 표현 묶음</h2><Link href="/expressions" className="text-sm font-bold text-teal-700">토픽 보기</Link></div>
           <div className="space-y-3">
             {recentDays.map((day) => (
-              <Link key={day.id} href={`/expressions?day=${day.id}`} className="block rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-card">
+              <Link key={day.id} href={`/expressions?topic=${day.id}`} className="block rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-card">
                 <p className="text-xs font-bold uppercase tracking-wide text-teal-700">{day.day_date ?? "날짜 없음"}</p>
                 <h3 className="mt-2 text-xl font-black text-ink">{day.title}</h3>
                 <p className="mt-2 text-sm text-slate-600">표현 {day.expressions.length}개 · {day.source_note ?? "학습 노트"}</p>

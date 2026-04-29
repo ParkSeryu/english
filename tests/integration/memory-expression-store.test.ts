@@ -112,8 +112,7 @@ describe("MemoryExpressionStore daily expression behavior", () => {
     const { expressionDay } = await store.approveDraft((await store.createDraft(payload)).id, "저장해");
 
     const unknown = await store.recordReviewResult(expressionDay.expressions[1].id, "unknown");
-    expect(unknown).toMatchObject({ unknown_count: 1, known_count: 0, review_count: 1, last_result: "unknown", interval_days: 0 });
-    expect(unknown.due_at).toBeTruthy();
+    expect(unknown).toMatchObject({ unknown_count: 1, known_count: 0, review_count: 1, last_result: "unknown", interval_days: 0, due_at: null });
 
     const repeatedUnknown = await store.recordReviewResult(expressionDay.expressions[1].id, "unknown");
     expect(repeatedUnknown).toMatchObject({ unknown_count: 2, known_count: 0, review_count: 2, last_result: "unknown", interval_days: 0 });

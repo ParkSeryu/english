@@ -1,11 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ExpressionCard } from "@/lib/types";
 
 vi.mock("@/app/actions", () => ({ recordExpressionReviewAction: vi.fn(async () => undefined) }));
 
+import { recordExpressionReviewAction } from "@/app/actions";
 import { MemorizeQueue } from "@/components/MemorizeQueue";
 
 function expression(overrides: Partial<ExpressionCard>): ExpressionCard {
@@ -36,8 +37,15 @@ function expression(overrides: Partial<ExpressionCard>): ExpressionCard {
 
 const first = expression({ id: "expression-1", korean_prompt: "첫 번째 한국어", english: "First answer" });
 const second = expression({ id: "expression-2", korean_prompt: "두 번째 한국어", english: "Second answer", source_order: 1 });
+const third = expression({ id: "expression-3", korean_prompt: "세 번째 한국어", english: "Third answer", source_order: 2 });
 
 describe("MemorizeQueue", () => {
+  const reviewAction = vi.mocked(recordExpressionReviewAction);
+
+  beforeEach(() => {
+    reviewAction.mockClear();
+  });
+
   it("optimistically advances to the next expression as soon as a review button is submitted", async () => {
     const user = userEvent.setup();
     render(<MemorizeQueue expressions={[first, second]} />);
@@ -50,5 +58,37 @@ describe("MemorizeQueue", () => {
     expect(screen.queryByText("First answer")).not.toBeInTheDocument();
     expect(screen.queryByText("첫 번째 한국어")).not.toBeInTheDocument();
     expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+  });
+
+  it("keeps locally deferred unknown cards stacked while reviewing before a server refresh lands", async () => {
+    const user = userEvent.setup();
+    render(<MemorizeQueue expressions={[first, second, third]} />);
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+    await waitFor(() => expect(reviewAction).toHaveBeenCalledTimes(1));
+
+    expect(reviewAction).toHaveBeenNthCalledWith(1, first.id, "unknown", "/memorize?defer=expression-1", expect.any(FormData));
+    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+    await waitFor(() => expect(reviewAction).toHaveBeenCalledTimes(2));
+
+    expect(reviewAction).toHaveBeenNthCalledWith(2, second.id, "unknown", "/memorize?defer=expression-1%2Cexpression-2", expect.any(FormData));
+    expect(screen.getByText("세 번째 한국어")).toBeInTheDocument();
+  });
+
+  it("uses the first expression from a refreshed deferred queue instead of carrying over the old active index", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<MemorizeQueue expressions={[first, second, third]} />);
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+
+    rerender(<MemorizeQueue expressions={[second, third, first]} deferredIds={[first.id]} />);
+
+    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+    expect(screen.queryByText("세 번째 한국어")).not.toBeInTheDocument();
   });
 });

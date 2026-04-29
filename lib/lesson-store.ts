@@ -235,7 +235,7 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 
   async getMemorizationQueue(options: { limit?: number } = {}) {
-    return scheduleMemorizationQueue(await this.listExpressions(), options.limit ?? 10);
+    return scheduleMemorizationQueue(await this.listExpressions(), options.limit ?? 300);
   }
 
   async getDashboardStats() {
@@ -269,7 +269,7 @@ class SupabaseExpressionStore implements ExpressionStore {
           last_result: result,
           last_reviewed_at: timestamp,
           interval_days: result === "known" ? nextKnownIntervalDays(current.interval_days) : 0,
-          due_at: result === "known" ? nextDueAtForKnown(nextKnownIntervalDays(current.interval_days), new Date(timestamp)) : nextDueAtForUnknown(new Date(timestamp)),
+          due_at: result === "known" ? nextDueAtForKnown(nextKnownIntervalDays(current.interval_days), new Date(timestamp)) : nextDueAtForUnknown(),
           updated_at: timestamp
         },
         { onConflict: "user_id,expression_id" }
@@ -520,7 +520,7 @@ export class MemoryExpressionStore implements ExpressionStore {
   }
 
   async getMemorizationQueue(options: { limit?: number } = {}) {
-    return scheduleMemorizationQueue(await this.listExpressions(), options.limit ?? 10).map(cloneExpression);
+    return scheduleMemorizationQueue(await this.listExpressions(), options.limit ?? 300).map(cloneExpression);
   }
 
   async getDashboardStats() {
@@ -552,7 +552,7 @@ export class MemoryExpressionStore implements ExpressionStore {
     } else {
       progress.unknown_count += 1;
       progress.interval_days = 0;
-      progress.due_at = nextDueAtForUnknown(new Date(timestamp));
+      progress.due_at = nextDueAtForUnknown();
     }
     progress.review_count += 1;
     progress.last_result = result;
@@ -719,7 +719,7 @@ function calculateStats(days: ExpressionDay[], expressions: ExpressionCard[], qu
     knownReviews: expressions.reduce((sum, card) => sum + card.known_count, 0),
     unknownReviews: expressions.reduce((sum, card) => sum + card.unknown_count, 0),
     unseenCount: expressions.filter((card) => !card.last_reviewed_at).length,
-    dueCount: scheduleMemorizationQueue(expressions, 10).length,
+    dueCount: scheduleMemorizationQueue(expressions, 300).length,
     dayCount: days.length,
     questionCount: questions.length,
     openQuestionCount: questions.filter((note) => note.status === "open").length
