@@ -98,7 +98,23 @@ describe("MemorizeQueue", () => {
     expect(screen.getByText("복습할 표현 2개")).toBeInTheDocument();
   });
 
+  it("shows the empty memorization state immediately after the last card is remembered", async () => {
+    const user = userEvent.setup();
+    render(<MemorizeQueue expressions={[first, second]} />);
 
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /외웠음/ }));
+    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /외웠음/ }));
+
+    expect(screen.getByText("복습할 표현 0개")).toBeInTheDocument();
+    expect(screen.getByText("암기할 표현이 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("배운 표현이 생기면 한국어 힌트로 바로 복습할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "표현 모아보기" })).toHaveAttribute("href", "/expressions");
+    expect(screen.queryByRole("button", { name: /정답 보기/ })).not.toBeInTheDocument();
+  });
 
   it("server-renders a preparation state before browser storage can restore the queue", () => {
     const html = renderToString(<MemorizeQueue expressions={[first, second, third]} />);

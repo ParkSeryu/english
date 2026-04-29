@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { EmptyState } from "@/components/EmptyState";
 import { MemorizeCard } from "@/components/MemorizeCard";
 import type { ExpressionCard } from "@/lib/types";
 
@@ -178,6 +179,7 @@ export function MemorizeQueue({ expressions, deferredIds, storageKey = DEFAULT_S
     return (
       <div className="space-y-5">
         <MemorizeQueueHeader remainingCount={remainingCount} />
+        <EmptyState title="암기할 표현이 없습니다" body="배운 표현이 생기면 한국어 힌트로 바로 복습할 수 있습니다." actionHref="/expressions" actionLabel="표현 모아보기" />
       </div>
     );
   }
