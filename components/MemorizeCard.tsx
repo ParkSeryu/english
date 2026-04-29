@@ -25,17 +25,16 @@ export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ??
         </button>
       ) : (
         <>
-          <div className="mt-6 rounded-3xl bg-ink p-5 text-white">
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-300">영어 정답</p>
+          <div className="mt-6 rounded-[1.75rem] bg-gradient-to-br from-ink to-slate-800 p-5 text-white shadow-lg shadow-slate-200">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-teal-200">영어 정답</p>
             <h1 className="mt-3 whitespace-pre-wrap text-2xl font-black leading-tight">{expression.english}</h1>
+            <div className="my-5 h-px bg-white/15" />
+            <p className="whitespace-pre-wrap text-lg font-semibold leading-7 text-slate-100">{expression.korean_prompt}</p>
           </div>
           <div className="mt-5 space-y-4" aria-live="polite">
-            <section className="rounded-3xl bg-slate-50 p-4">
-              <p className="whitespace-pre-wrap text-lg font-semibold text-ink">{expression.korean_prompt}</p>
-            </section>
             {expression.grammar_note ? <Info title="문법/패턴" body={expression.grammar_note} /> : null}
             {expression.examples.length > 0 ? (
-              <section className="rounded-3xl bg-slate-50 p-4">
+              <section className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
                 <h2 className="text-sm font-black uppercase tracking-wide text-slate-500">비슷한 표현</h2>
                 <ul className="mt-2 space-y-2">
                   {expression.examples.map((example) => (
@@ -48,7 +47,7 @@ export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ??
               </section>
             ) : null}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form action={unknownAction} onSubmit={() => { setRevealed(false); onReviewSubmit?.("unknown"); }}><button type="submit" className="min-h-14 w-full rounded-full bg-red-500 px-5 py-3 font-black text-white shadow-lg shadow-red-100 transition hover:bg-red-600">모름</button></form>
+              <form action={unknownAction} onSubmit={() => { setRevealed(false); onReviewSubmit?.("unknown"); }}><button type="submit" className="min-h-14 w-full rounded-full border border-rose-200 bg-rose-50 px-5 py-3 font-black text-rose-700 transition hover:bg-rose-100">모름</button></form>
               <form action={knownAction} onSubmit={() => onReviewSubmit?.("known")}><button type="submit" className="min-h-14 w-full rounded-full bg-emerald-600 px-5 py-3 font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700">외웠음</button></form>
             </div>
           </div>
@@ -59,5 +58,5 @@ export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ??
 }
 
 function Info({ title, body }: { title: string; body: string }) {
-  return <section className="rounded-3xl bg-slate-50 p-4"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">{title}</h2><p className="mt-2 whitespace-pre-wrap text-base leading-7 text-slate-700">{body}</p></section>;
+  return <section className="rounded-3xl border border-slate-100 bg-slate-50 p-4"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">{title}</h2><p className="mt-2 whitespace-pre-wrap text-base leading-7 text-slate-700">{body}</p></section>;
 }
