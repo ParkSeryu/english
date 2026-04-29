@@ -1,20 +1,51 @@
 import type { ExpressionCard } from "@/lib/types";
 
-type MemorizationCandidate = Pick<ExpressionCard, "id" | "unknown_count" | "known_count" | "last_reviewed_at" | "last_result" | "source_order"> &
+type MemorizationCandidate = Pick<ExpressionCard, "id" | "unknown_count" | "known_count" | "last_reviewed_at" | "last_result" | "source_order" | "due_at" | "interval_days"> &
   Partial<Pick<ExpressionCard, "created_at">>;
 
-const KNOWN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_LIMIT = 10;
+const UNKNOWN_RELEARN_DELAY_MINUTES = 10;
+const MAX_INTERVAL_DAYS = 30;
+
+function timeRank(value: string | null | undefined, fallback: number) {
+  if (!value) return fallback;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : fallback;
+}
 
 function reviewedRank(card: MemorizationCandidate): number {
-  if (!card.last_reviewed_at) return Number.NEGATIVE_INFINITY;
-  const timestamp = Date.parse(card.last_reviewed_at);
-  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+  return timeRank(card.last_reviewed_at, Number.NEGATIVE_INFINITY);
+}
+
+function dueRank(card: MemorizationCandidate): number {
+  return timeRank(card.due_at, Number.NEGATIVE_INFINITY);
 }
 
 function createdRank(card: MemorizationCandidate): number {
-  if (!card.created_at) return 0;
-  const timestamp = Date.parse(card.created_at);
-  return Number.isFinite(timestamp) ? timestamp : 0;
+  return timeRank(card.created_at, 0);
+}
+
+export function isExpressionDue(card: MemorizationCandidate, now = new Date()) {
+  if (!card.last_reviewed_at) return true;
+  if (!card.due_at) return true;
+  const dueAt = Date.parse(card.due_at);
+  if (!Number.isFinite(dueAt)) return true;
+  return dueAt <= now.getTime();
+}
+
+export function nextKnownIntervalDays(currentIntervalDays: number) {
+  if (currentIntervalDays <= 0) return 1;
+  if (currentIntervalDays < 3) return 3;
+  if (currentIntervalDays < 7) return 7;
+  return Math.min(currentIntervalDays * 2, MAX_INTERVAL_DAYS);
+}
+
+export function nextDueAtForUnknown(now = new Date()) {
+  return new Date(now.getTime() + UNKNOWN_RELEARN_DELAY_MINUTES * 60 * 1000).toISOString();
+}
+
+export function nextDueAtForKnown(intervalDays: number, now = new Date()) {
+  return new Date(now.getTime() + intervalDays * 24 * 60 * 60 * 1000).toISOString();
 }
 
 export function compareExpressionsForMemorization<T extends MemorizationCandidate>(a: T, b: T) {
@@ -23,6 +54,10 @@ export function compareExpressionsForMemorization<T extends MemorizationCandidat
 
   const unseenDelta = Number(!b.last_reviewed_at) - Number(!a.last_reviewed_at);
   if (unseenDelta !== 0) return unseenDelta;
+
+  const aDue = dueRank(a);
+  const bDue = dueRank(b);
+  if (aDue !== bDue) return aDue < bDue ? -1 : 1;
 
   const knownDelta = a.known_count - b.known_count;
   if (knownDelta !== 0) return knownDelta;
@@ -34,15 +69,8 @@ export function compareExpressionsForMemorization<T extends MemorizationCandidat
   return a.source_order - b.source_order || createdRank(a) - createdRank(b);
 }
 
-function isKnownCoolingDown(card: MemorizationCandidate, now: Date) {
-  if (card.last_result !== "known" || card.known_count <= 0 || card.unknown_count > 0 || !card.last_reviewed_at) return false;
-  const lastReviewed = Date.parse(card.last_reviewed_at);
-  if (!Number.isFinite(lastReviewed)) return false;
-  return now.getTime() - lastReviewed < KNOWN_COOLDOWN_MS;
-}
-
-export function scheduleMemorizationQueue<T extends MemorizationCandidate>(cards: T[], limit = 10, now = new Date()) {
-  return [...cards].filter((card) => !isKnownCoolingDown(card, now)).sort(compareExpressionsForMemorization).slice(0, limit);
+export function scheduleMemorizationQueue<T extends MemorizationCandidate>(cards: T[], limit = DEFAULT_LIMIT, now = new Date()) {
+  return [...cards].filter((card) => isExpressionDue(card, now)).sort(compareExpressionsForMemorization).slice(0, limit);
 }
 
 export const scheduleMemorizeQueue = scheduleMemorizationQueue;

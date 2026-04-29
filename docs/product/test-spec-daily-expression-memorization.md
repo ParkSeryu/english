@@ -29,8 +29,8 @@ Implementation is complete only when:
 | Approval gate | Unit/integration/security | Non-approval feedback does not insert; explicit approval inserts or publishes one approved expression day; drafts are not learner-visible. |
 | Store insertion | Integration | Expression day and expressions are inserted together as shared content; per-user progress starts empty. |
 | Memorization reveal | Component/e2e | Korean is visible before reveal; English hidden until `정답 보기`. |
-| Review result state | Integration | `모름` increments the current user's `unknown_count` once per review session without repeated-tap stacking; `맞췄음` increments `known_count` once per review session and sets `last_result = known`; both update that user's `review_count`. |
-| Queue priority | Unit/integration | Higher unknown count appears before lower unknown/known-heavy items; never-reviewed items remain visible; recently known cards are excluded for 24 hours. |
+| Review result state | Integration | `모름` increments cumulative `unknown_count`, resets `interval_days` to 0, and sets a same-day `due_at`; `외웠음` increments cumulative `known_count`, increases `interval_days`, sets future `due_at`, and both update `review_count`. |
+| Queue priority | Unit/integration | Only new/due cards appear; higher unknown count appears before lower unknown/known-heavy due items; future-due known cards are excluded until `due_at`. |
 | Grammar point | Component/e2e | Point displays after reveal/detail but is not the primary prompt. |
 | Question notes | Integration/e2e | Add question, optionally link it to an expression/day, list open first, mark asked, reopen. |
 | RLS | SQL/container/security | Authenticated users can read shared expression content; anonymous users cannot; progress/questions remain cross-user isolated. |
@@ -56,14 +56,14 @@ Implementation is complete only when:
 
 - Before reveal: Korean text visible, English hidden.
 - After reveal: English answer and grammar/structure/nuance support visible.
-- Buttons are `맞췄음` and `모름`.
+- Buttons are `외웠음` and `모름`.
 
 ### AC-004 — Unknown-weighted queue improves memorization
 
-- `모름` increments the current user `unknown_count` once per review session in `expression_progress`; repeated taps on the same revealed card do not stack multiple increments.
-- Higher cumulative `unknown_count` cards rank ahead of lower-priority cards.
-- `맞췄음` increments the current user `known_count` once per review session, sets `last_result = known`, removes immediate unknown priority, and excludes the card from the memorize queue for 24 hours from `last_reviewed_at`.
-- Recently unknown cards do not have to appear immediately next, but remain high priority.
+- `모름` increments cumulative `unknown_count`, sets `last_result = unknown`, resets `interval_days` to 0, and schedules `due_at` later the same day.
+- Higher cumulative `unknown_count` due cards rank ahead of lower-priority cards.
+- `외웠음` increments cumulative `known_count`, sets `last_result = known`, advances intervals 1 → 3 → 7 → 14 → max 30 days, and excludes the card until `due_at`.
+- Future-due cards do not appear in the memorize queue; never-reviewed cards are immediately due.
 
 ### AC-005 — Question ideation is quick
 
@@ -106,7 +106,7 @@ npm audit --audit-level=moderate
 4. Confirm Korean prompt is shown and English hidden.
 5. Reveal English.
 6. Mark one card `모름` multiple times.
-7. Confirm it appears earlier than cards with many `맞췄음` marks.
+7. Confirm it returns when due and appears earlier than lower-unknown due cards.
 8. Add a class question in the Questions tab.
 9. Mark it asked and reopen it.
 10. Log in as a second user/test identity and confirm the same expressions are visible with zero counters and no memo.

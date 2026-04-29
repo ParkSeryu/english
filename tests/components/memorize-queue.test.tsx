@@ -25,6 +25,8 @@ function expression(overrides: Partial<ExpressionCard>): ExpressionCard {
     review_count: 0,
     last_result: null,
     last_reviewed_at: null,
+    due_at: null,
+    interval_days: 0,
     created_at: "2026-04-27T00:00:00.000Z",
     updated_at: "2026-04-28T00:00:00.000Z",
     examples: [],

@@ -16,7 +16,7 @@ Rebuild the current lesson-oriented app into a daily expression memorization app
 
 1. Sentence memorization over concept management.
 2. Korean prompt first, English hidden until reveal.
-3. Buttons stay simple: `맞췄음` / `모름`.
+3. Buttons stay simple: `외웠음` / `모름`.
 4. Unknown-weighted scheduling, not complex SRS.
 5. Question ideation is lightweight and fast.
 6. Approval-gated LLM ingestion remains mandatory.
@@ -32,13 +32,12 @@ Rebuild the current lesson-oriented app into a daily expression memorization app
   - `ExpressionIngestionPayload`
 - Validation accepts daily expression payloads.
 - Add date normalization helper for `260427`, `20260427`, `YYYY-MM-DD`.
-- Replace status scheduling with counter-based queue:
-  - unknown desc,
-  - never-reviewed boost,
-  - known 24-hour cooldown,
-  - known state penalty after cooldown,
-  - least recently reviewed,
-  - source order.
+- Replace status scheduling with due-based Anki-lite queue:
+  - new or `due_at <= now` only,
+  - higher cumulative unknown count first,
+  - same-day retry after `모름`,
+  - 1/3/7/14+ day intervals after `외웠음`,
+  - least recently reviewed and source order as tie-breakers.
 
 ### Phase 2 — Store and ingestion API
 
@@ -96,7 +95,7 @@ The repository still reflects the previous lesson/review MVP in the worker basel
 
 - `lib/types.ts` is still centered on `Lesson`, `StudyItem`, lesson examples, and status values (`new`, `learning`, `memorized`, `confusing`). The new domain types should be introduced as the primary app contract instead of adapting the old status model.
 - `lib/validation.ts` currently validates lesson ingestion payloads and only accepts `YYYY-MM-DD` dates. It needs an expression-day schema with compact-date normalization for `260427`, `20260427`, and already-normalized `YYYY-MM-DD` inputs.
-- `lib/scheduling.ts` currently orders by legacy status. Replace this with an unknown-weighted expression queue that prioritizes `unknown_count`, never-reviewed cards, a 24-hour cooldown for cards whose latest result is `known`, known-state penalty after cooldown, least-recent review, and source order.
+- `lib/scheduling.ts` currently orders by legacy status. Replace this with a two-button Anki-lite expression queue: new/due cards only, cumulative `unknown_count` priority, same-day retry after `모름`, and successful intervals of 1/3/7/14+ days after `외웠음`.
 - `lib/lesson-store.ts` mixes persistence, ingestion approval, review updates, and memory test state for lesson records. Rename or replace it with an `ExpressionStore` surface so UI and tests no longer depend on lesson terminology for the new path.
 - `components/AppNav.tsx` is a top header with `레슨` and `복습`; the MVP requires a mobile bottom GNB containing `표현`, `암기`, and `질문거리`, with Questions always reachable.
 - Existing pages under `/lessons`, `/items`, `/review`, and `/cards` can remain as redirects/rollback affordances, but the primary routes must be `/expression-days`, `/expression-days/[id]`, `/expressions/[id]`, `/memorize`, and `/questions`.
@@ -107,8 +106,8 @@ The repository still reflects the previous lesson/review MVP in the worker basel
 - Keep the domain language consistent: new app code should use `ExpressionDay`, `ExpressionCard`, `QuestionNote`, and `ExpressionIngestionPayload`. Avoid adding new lesson/study-item references outside compatibility redirects or legacy migration comments.
 - Preserve the explicit approval gate by keeping draft/revise/approve as separate operations. API routes may prepare or revise drafts, but only approve routes with an approval phrase may insert expression rows.
 - Do not accept or persist client-supplied `owner_id`. Store methods and API routes must derive ownership from authenticated user context or the configured ingestion owner.
-- Keep Korean-first memorization simple: Korean prompt is visible first; English, grammar point, and naturalness notes are hidden until reveal; only `맞췄음` and `모름` record review results.
-- Avoid SRS abstractions for MVP. A small deterministic comparator and direct counter updates are preferable to a scheduler class or configurable algorithm.
+- Keep Korean-first memorization simple: Korean prompt is visible first; English, grammar point, and naturalness notes are hidden until reveal; only `외웠음` and `모름` record review results.
+- Keep Anki-lite deterministic and small. Do not copy the full Anki algorithm; use `due_at`, `interval_days`, cumulative counters, and a pure comparator.
 - Keep question notes intentionally small: `question_text`, open/asked status, optional day/expression links, and optional answer note. Do not add tags, search, calendar, AI rewrite, or long-form notes.
 - Keep generated routes and actions server-side where possible; favor existing auth helpers and revalidation patterns over introducing new client-side data libraries.
 
@@ -129,7 +128,7 @@ Owns database shape, domain types, validation, queue logic, ingestion persistenc
   - record review result,
   - create/list/update question notes,
   - create/revise/approve ingestion drafts.
-- Ensure review updates increment `review_count`, update `last_reviewed_at`, set `last_result`, and increment the matching known/unknown cumulative counter once per review session, set `last_result`, and prevent repeated taps on the same revealed card from stacking multiple increments.
+- Ensure review updates increment `review_count`, update `last_reviewed_at`, set `last_result`, increment cumulative known/unknown counters, update `interval_days`, and set `due_at` according to the Anki-lite policy.
 - Ensure memory-store behavior mirrors Supabase behavior closely enough for unit, integration, and e2e tests.
 
 #### UI Lane
@@ -140,7 +139,7 @@ Owns route replacement, mobile flow, and copy.
 - Update `/` to summarize recent/today expression days, total expressions, unknown count, known count, and open questions.
 - Add a bottom GNB with `표현`, `암기`, and `질문거리`; keep logout/login accessible without displacing the bottom tabs.
 - Build the memorize card so the Korean prompt is visible before reveal and English/grammar/naturalness information appears only after `정답 보기`.
-- Wire `맞췄음` and `모름` actions to the store review-result API.
+- Wire `외웠음` and `모름` actions to the store review-result API.
 - Implement Questions quick-add, open-first listing, `물어봄`, and `다시 열기` actions.
 - Redirect legacy `/lessons`, `/items`, `/review`, and `/cards` paths to the closest new route instead of leaving broken lesson screens as the primary path.
 
@@ -148,7 +147,7 @@ Owns route replacement, mobile flow, and copy.
 
 Owns regression coverage and gate commands.
 
-- Replace legacy lesson scheduling tests with unknown-count queue tests covering never-reviewed cards, unknown-count priority, 24-hour known cooldown, least-recent review, and source-order tie-breaks.
+- Replace legacy lesson scheduling tests with Anki-lite queue tests covering never-reviewed cards, future-due exclusion, unknown-count priority, successful interval progression, least-recent review, and source-order tie-breaks.
 - Replace ingestion validation tests with expression-day payload tests, compact-date tests, approval-gate tests, and malformed payload rejection.
 - Replace memory store integration tests with expression-day insertion, shared content visibility, per-user progress isolation, cumulative review counter updates, question note add/asked/reopen, and no-save-before-approval coverage.
 - Replace component tests with Korean-first memorize-card reveal behavior.
@@ -165,8 +164,8 @@ Before final integration, verify all of the following against the PRD and test s
 - [x] Explicit approval inserts exactly one expression day with its expressions for the configured owner.
 - [x] Non-approval Korean feedback such as `좋네`, `괜찮아`, or `이 문장 자연스러워?` does not insert.
 - [x] Memorization starts Korean-first and hides English until reveal.
-- [x] `모름` increments `unknown_count` once per review session without repeated-tap stacking; `맞췄음` increments `known_count` once per review session, sets `last_result = known`, and removes it from that user's memorize queue for 24 hours; both increment `review_count`.
-- [x] Queue ordering visibly favors higher `unknown_count` without immediately requiring complex SRS.
+- [x] `모름` increments cumulative `unknown_count`, resets interval, and schedules a same-day retry; `외웠음` increments cumulative `known_count`, advances interval, and hides the card until `due_at`; both increment `review_count`.
+- [x] Queue includes only new/due cards and visibly favors higher cumulative `unknown_count` among due cards.
 - [x] Questions bottom tab supports quick add, asked, reopen, and open-first sorting.
 - [x] RLS denies anon access, allows shared expression reads to authenticated users, and keeps progress/questions user-scoped.
 - [x] No voice/pronunciation, speech recognition, gamification, or complex SRS scope was added.
@@ -204,7 +203,7 @@ $team 3:executor "Implement docs/product/implementation-plan-daily-expression-me
 
 - Daily expression days replace lesson UI as the primary app path at `/expression-days`.
 - Memorization uses Korean prompt → hidden English → reveal.
-- `모름` increments the learner's cumulative unknown counter and affects queue priority.
+- `모름` increments the learner's cumulative unknown counter, schedules a same-day retry, and affects due-card priority.
 - Questions tab supports quick add/asked/reopen.
 - LLM ingestion saves only after explicit approval.
 - Full verification passes.

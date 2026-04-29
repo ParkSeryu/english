@@ -26,7 +26,7 @@ The app is not a grammar notebook and not a heavy lesson-management system. It i
 3. See Korean.
 4. Recall English.
 5. Reveal answer.
-6. Mark `맞췄음` or `모름`.
+6. Mark `외웠음` or `모름`.
 7. Expressions marked `모름` show up more often for that learner only.
 8. Quickly write private questions to ask in class.
 
@@ -74,6 +74,8 @@ Each expression card supports:
   - `review_count`
   - `last_reviewed_at`
   - `last_result` = `known | unknown | null`
+  - `due_at` for the next review time; null means immediately due
+  - `interval_days` for the current successful-review spacing interval
   - `user_memo`
 
 ### Memorization flow
@@ -81,21 +83,20 @@ Each expression card supports:
 - Primary mode: Korean prompt → recall English.
 - English answer is hidden until user taps `정답 보기`.
 - After reveal, user chooses:
-  - `맞췄음`
+  - `외웠음`
   - `모름`
-- `모름` marks the current learner's latest state as unknown, increments `unknown_count` once for that review session, and makes the card appear more frequently for that learner. Repeated taps on the same revealed card must not stack multiple increments.
-- `맞췄음` marks the current learner's latest state as known, increments `known_count` once for that review session, clears immediate unknown priority through `last_result = known`, and removes the card from that learner's memorize queue for 24 hours.
+- `모름` marks the current learner's latest state as unknown, increments cumulative `unknown_count`, resets `interval_days` to 0, and schedules the card to return later the same day (`due_at = now + 10 minutes`).
+- `외웠음` marks the current learner's latest state as known, increments cumulative `known_count`, increases the successful-review interval, and schedules the next review by `due_at`.
 
 ### MVP review scheduling
 
-MVP should use a simple, understandable heuristic instead of a full SRS engine:
+MVP uses a simple two-button Anki-lite scheduler instead of the full Anki algorithm:
 
-1. Higher `unknown_count` first.
-2. Never-reviewed cards stay near the front.
-3. Cards marked known are hidden for 24 hours after `last_reviewed_at`.
-4. After the 24-hour known cooldown, tie-break by known state, least recently reviewed, then original order.
-
-The cooldown is intentionally simple: it only applies to cards whose latest result is `known`; cards marked `unknown` remain eligible immediately.
+1. Only new cards or cards with `due_at <= now` appear in the memorize queue.
+2. New/never-reviewed cards are immediately due.
+3. `모름` returns the card later the same day and keeps it high priority through cumulative `unknown_count`.
+4. `외웠음` uses successful-review intervals: 1 day → 3 days → 7 days → 14 days → up to 30 days.
+5. Due cards are ordered by higher `unknown_count`, never-reviewed state, older `due_at`, lower `known_count`, least-recent review, then original order.
 
 ### Grammar/point support
 
@@ -205,6 +206,8 @@ The MVP separates **shared study content** from **private learner state**.
 - `review_count int not null default 0`
 - `last_result text check in ('known', 'unknown')`
 - `last_reviewed_at timestamptz`
+- `due_at timestamptz`
+- `interval_days int not null default 0`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 - primary key `(user_id, expression_id)`
@@ -256,8 +259,8 @@ Reuse or adapt the existing ingestion run concept, but `normalized_payload` shou
 
 - Korean prompt only before reveal.
 - Button: `정답 보기`.
-- After reveal: English answer, grammar point, `맞췄음`, `모름`.
-- Queue uses unknown-weighted priority.
+- After reveal: English answer, grammar point, `외웠음`, `모름`.
+- Queue uses due-based two-button Anki-lite scheduling.
 
 ### `/questions`
 
@@ -271,8 +274,8 @@ Reuse or adapt the existing ingestion run concept, but `normalized_payload` shou
 2. No expression day is saved before explicit approval.
 3. The app shows date-based expression days.
 4. Memorization shows Korean first and hides English before reveal.
-5. `모름` increments `unknown_count` once per review session without repeated-tap stacking and increases future queue priority.
-6. `맞췄음` increments `known_count` once per review session, clears immediate unknown priority through `last_result = known`, and decreases priority relative to unknown cards.
+5. `모름` increments cumulative `unknown_count`, resets the interval, and schedules a same-day retry.
+6. `외웠음` increments cumulative `known_count`, increases the interval, and schedules the next due date.
 7. Grammar points display as hints/support after reveal or detail.
 8. Questions tab lets the user add and mark class questions.
 9. Supabase RLS lets authenticated users read shared expression content while keeping `expression_progress`, `question_notes`, and `ingestion_runs` scoped to their owner/user.

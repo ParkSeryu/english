@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { isExplicitLessonSaveApproval } from "@/lib/ingestion/approval";
-import { scheduleMemorizationQueue } from "@/lib/scheduling";
+import { nextDueAtForKnown, nextDueAtForUnknown, nextKnownIntervalDays, scheduleMemorizationQueue } from "@/lib/scheduling";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
 import { isE2EMemoryMode } from "@/lib/test-mode";
@@ -74,9 +74,16 @@ function normalizeGrammarNote(note: string | null | undefined) {
   const routineExplanationPattern = /(현재시제|과거시제|미래시제|현재의\s*일반적인\s*사실|일반적인\s*사실|체질|문맥상|암기|원문\s*그대로|present tense|past tense|future tense|context)/i;
   if (routineExplanationPattern.test(lowerValue)) return null;
 
-  const firstLine = value.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
-  if (!firstLine || firstLine.length > 80) return null;
-  return firstLine;
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return null;
+  if (lines.some((line) => line.length > 80)) return null;
+
+  const compactNote = lines.slice(0, 4).join("\n");
+  if (compactNote.length > 240) return null;
+  return compactNote;
 }
 
 function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
@@ -115,6 +122,8 @@ function defaultProgress(userId: string, expressionId: string, timestamp = nowIs
     review_count: 0,
     last_result: null,
     last_reviewed_at: null,
+    due_at: null,
+    interval_days: 0,
     created_at: timestamp,
     updated_at: timestamp
   };
@@ -128,7 +137,9 @@ function applyProgress(card: ExpressionCard, progress?: Partial<ExpressionProgre
     unknown_count: progress?.unknown_count ?? 0,
     review_count: progress?.review_count ?? 0,
     last_result: progress?.last_result ?? null,
-    last_reviewed_at: progress?.last_reviewed_at ?? null
+    last_reviewed_at: progress?.last_reviewed_at ?? null,
+    due_at: progress?.due_at ?? null,
+    interval_days: progress?.interval_days ?? 0
   };
 }
 
@@ -252,11 +263,13 @@ class SupabaseExpressionStore implements ExpressionStore {
           user_id: this.user.id,
           expression_id: id,
           user_memo: current.user_memo ?? null,
-          known_count: result === "known" ? 1 : 0,
-          unknown_count: result === "unknown" ? 1 : 0,
+          known_count: result === "known" ? current.known_count + 1 : current.known_count,
+          unknown_count: result === "unknown" ? current.unknown_count + 1 : current.unknown_count,
           review_count: current.review_count + 1,
           last_result: result,
           last_reviewed_at: timestamp,
+          interval_days: result === "known" ? nextKnownIntervalDays(current.interval_days) : 0,
+          due_at: result === "known" ? nextDueAtForKnown(nextKnownIntervalDays(current.interval_days), new Date(timestamp)) : nextDueAtForUnknown(new Date(timestamp)),
           updated_at: timestamp
         },
         { onConflict: "user_id,expression_id" }
@@ -281,6 +294,8 @@ class SupabaseExpressionStore implements ExpressionStore {
           review_count: current.review_count,
           last_result: current.last_result,
           last_reviewed_at: current.last_reviewed_at,
+          due_at: current.due_at,
+          interval_days: current.interval_days,
           updated_at: timestamp
         },
         { onConflict: "user_id,expression_id" }
@@ -530,8 +545,15 @@ export class MemoryExpressionStore implements ExpressionStore {
       progress = defaultProgress(this.user.id, id, timestamp);
       memoryState().expressionProgress.push(progress);
     }
-    progress.known_count = result === "known" ? 1 : 0;
-    progress.unknown_count = result === "unknown" ? 1 : 0;
+    if (result === "known") {
+      progress.known_count += 1;
+      progress.interval_days = nextKnownIntervalDays(progress.interval_days);
+      progress.due_at = nextDueAtForKnown(progress.interval_days, new Date(timestamp));
+    } else {
+      progress.unknown_count += 1;
+      progress.interval_days = 0;
+      progress.due_at = nextDueAtForUnknown(new Date(timestamp));
+    }
     progress.review_count += 1;
     progress.last_result = result;
     progress.last_reviewed_at = timestamp;
@@ -645,6 +667,8 @@ export class MemoryExpressionStore implements ExpressionStore {
         review_count: 0,
         last_result: null,
         last_reviewed_at: null,
+        due_at: null,
+        interval_days: 0,
         created_at: timestamp,
         updated_at: timestamp,
         examples: (cardInput.examples ?? []).map((exampleInput, exampleIndex) => ({

@@ -24,6 +24,8 @@ const expression: ExpressionCard = {
   review_count: 0,
   last_result: null,
   last_reviewed_at: null,
+  due_at: null,
+  interval_days: 0,
   created_at: "2026-04-28T00:00:00.000Z",
   updated_at: "2026-04-28T00:00:00.000Z",
   examples: [{ id: "example-1", expression_id: "expression-1", example_text: "I have to study English.", meaning_ko: "나는 영어를 공부해야 한다.", source: "llm", sort_order: 0, created_at: "2026-04-28T00:00:00.000Z" }]
@@ -40,7 +42,7 @@ describe("MemorizeCard", () => {
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
 
     expect(screen.getByText(expression.english)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /맞췄음/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /외웠음/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /모름/ })).toBeInTheDocument();
   });
 });

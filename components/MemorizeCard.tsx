@@ -13,13 +13,13 @@ export function MemorizeCard({ expression, returnTo = "/memorize", onReviewSubmi
   return (
     <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-card">
       <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-500">
-        <span>맞춤 {expression.known_count}회</span>
+        <span>외움 {expression.known_count}회</span>
         <span>모름 {expression.unknown_count}회</span>
       </div>
 
       {!revealed ? (
         <button type="button" onClick={() => setRevealed(true)} className="mt-6 block w-full rounded-3xl bg-ink p-5 text-left text-white shadow-lg shadow-slate-200 transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-teal-200" aria-expanded="false">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-300">한국어를 보고 영어 문장을 떠올리기</p>
+          <p className="text-sm font-black text-teal-200">한국어를 보고 영어로 말하기</p>
           <h1 className="mt-3 whitespace-pre-wrap text-2xl font-black leading-tight">{expression.korean_prompt}</h1>
           <span className="mt-5 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-teal-600 px-5 py-3 text-center text-base font-black text-white">정답 보기</span>
         </button>
@@ -48,8 +48,8 @@ export function MemorizeCard({ expression, returnTo = "/memorize", onReviewSubmi
               </section>
             ) : null}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form action={knownAction} onSubmit={onReviewSubmit}><button type="submit" className="btn-secondary min-h-14 w-full">맞췄음</button></form>
-              <form action={unknownAction} onSubmit={() => { setRevealed(false); onReviewSubmit?.(); }}><button type="submit" className="min-h-14 w-full rounded-full bg-amber-500 px-5 py-3 font-black text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600">모름</button></form>
+              <form action={unknownAction} onSubmit={() => { setRevealed(false); onReviewSubmit?.(); }}><button type="submit" className="min-h-14 w-full rounded-full bg-red-500 px-5 py-3 font-black text-white shadow-lg shadow-red-100 transition hover:bg-red-600">모름</button></form>
+              <form action={knownAction} onSubmit={onReviewSubmit}><button type="submit" className="min-h-14 w-full rounded-full bg-emerald-600 px-5 py-3 font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700">외웠음</button></form>
             </div>
           </div>
         </>

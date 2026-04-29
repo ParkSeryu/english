@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { AppNav } from "@/components/AppNav";
+import { NavigationProgress } from "@/components/NavigationProgress";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -70,6 +71,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="ko">
       <body className={inter.className}>
         <ServiceWorkerRegistration />
+        <NavigationProgress />
         <AppNav user={user} />
         <main className="mx-auto min-h-[calc(100vh-64px)] max-w-3xl px-4 pb-28 pt-6 sm:py-8">{children}</main>
         <Analytics />

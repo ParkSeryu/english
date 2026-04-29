@@ -44,6 +44,10 @@ export type ExpressionCard = {
   review_count: number;
   last_result: "known" | "unknown" | null;
   last_reviewed_at: string | null;
+  /** Next time this learner should see the expression again. Null means immediately due. */
+  due_at: string | null;
+  /** Current spaced-repetition interval after successful reviews. 0 means same-day learning/relearning. */
+  interval_days: number;
   created_at: string;
   updated_at: string;
   examples: ExpressionExample[];
@@ -72,6 +76,10 @@ export type ExpressionProgress = {
   review_count: number;
   last_result: "known" | "unknown" | null;
   last_reviewed_at: string | null;
+  /** Next time this learner should see the expression again. Null means immediately due. */
+  due_at: string | null;
+  /** Current spaced-repetition interval after successful reviews. 0 means same-day learning/relearning. */
+  interval_days: number;
   created_at: string;
   updated_at: string;
 };

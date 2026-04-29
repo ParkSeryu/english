@@ -27,6 +27,8 @@ type ExpressionCardForTest = {
   review_count: number;
   last_result: "known" | "unknown" | null;
   last_reviewed_at: string | null;
+  due_at: string | null;
+  interval_days: number;
   created_at: string;
   updated_at: string;
   examples: Array<{
@@ -60,6 +62,8 @@ const expression: ExpressionCardForTest = {
   review_count: 3,
   last_result: "unknown",
   last_reviewed_at: "2026-04-28T00:00:00.000Z",
+  due_at: "2026-04-28T00:10:00.000Z",
+  interval_days: 0,
   created_at: "2026-04-27T00:00:00.000Z",
   updated_at: "2026-04-28T00:00:00.000Z",
   examples: [{ id: "example-1", expression_id: "expression-1", example_text: "They don't seem interested in me.", meaning_ko: "그들은 나에게 관심이 없어 보여요.", source: "llm", sort_order: 0, created_at: "2026-04-28T00:00:00.000Z" }]
@@ -85,7 +89,7 @@ describe("MemorizeCard", () => {
     expect(screen.queryByText("구조")).not.toBeInTheDocument();
     expect(screen.queryByText(expression.nuance_note ?? "")).not.toBeInTheDocument();
     expect(screen.queryByText(expression.structure_note ?? "")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /맞췄음/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /외웠음/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /모름/ })).toBeInTheDocument();
   });
 

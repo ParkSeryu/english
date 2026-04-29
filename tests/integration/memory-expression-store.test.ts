@@ -24,6 +24,8 @@ type ExpressionCard = {
   review_count: number;
   last_result: ReviewResult | null;
   last_reviewed_at: string | null;
+  due_at: string | null;
+  interval_days: number;
 };
 
 type ExpressionDay = { id: string; owner_id: string; day_date: string; title: string; expressions: ExpressionCard[] };
@@ -104,25 +106,27 @@ describe("MemoryExpressionStore daily expression behavior", () => {
     expect(approved.expressionUrls[0]).toMatch(/^\/expressions\//);
   });
 
-  it("records current known/unknown state without stacking repeated taps and prioritizes unknown items", async () => {
+  it("records cumulative Anki-lite review counters and next due times", async () => {
     const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
     const store = new MemoryExpressionStore(userA);
     const { expressionDay } = await store.approveDraft((await store.createDraft(payload)).id, "저장해");
 
     const unknown = await store.recordReviewResult(expressionDay.expressions[1].id, "unknown");
-    expect(unknown).toMatchObject({ unknown_count: 1, known_count: 0, review_count: 1, last_result: "unknown" });
+    expect(unknown).toMatchObject({ unknown_count: 1, known_count: 0, review_count: 1, last_result: "unknown", interval_days: 0 });
+    expect(unknown.due_at).toBeTruthy();
 
     const repeatedUnknown = await store.recordReviewResult(expressionDay.expressions[1].id, "unknown");
-    expect(repeatedUnknown).toMatchObject({ unknown_count: 1, known_count: 0, review_count: 2, last_result: "unknown" });
+    expect(repeatedUnknown).toMatchObject({ unknown_count: 2, known_count: 0, review_count: 2, last_result: "unknown", interval_days: 0 });
 
     const known = await store.recordReviewResult(expressionDay.expressions[0].id, "known");
-    expect(known).toMatchObject({ unknown_count: 0, known_count: 1, review_count: 1, last_result: "known" });
+    expect(known).toMatchObject({ unknown_count: 0, known_count: 1, review_count: 1, last_result: "known", interval_days: 1 });
+    expect(known.due_at).toBeTruthy();
 
     const queue = await store.getMemorizationQueue();
-    expect(queue[0].id).toBe(unknown.id);
+    expect(queue.map((item) => item.id)).not.toContain(known.id);
 
     const switchedKnown = await store.recordReviewResult(expressionDay.expressions[1].id, "known");
-    expect(switchedKnown).toMatchObject({ unknown_count: 0, known_count: 1, review_count: 3, last_result: "known" });
+    expect(switchedKnown).toMatchObject({ unknown_count: 2, known_count: 1, review_count: 3, last_result: "known", interval_days: 1 });
   });
 
   it("shares expression content while keeping progress, memos, and question notes per user", async () => {

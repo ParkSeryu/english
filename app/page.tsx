@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   }
 
   const store = getExpressionStore(user);
-  const { stats, recentDays, queue } = await store.getDashboardOverview({ queueLimit: 3, recentDayLimit: 3 });
+  const { stats, recentDays } = await store.getDashboardOverview({ queueLimit: 0, recentDayLimit: 3 });
 
   return (
     <div className="space-y-6">
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="표현" value={stats.total} />
           <StatCard label="미확인" value={stats.unseenCount} />
-          <StatCard label="맞춤" value={stats.knownReviews} />
+          <StatCard label="외움" value={stats.knownReviews} />
           <StatCard label="모름" value={stats.unknownReviews} />
         </div>
       </section>
@@ -44,9 +44,8 @@ export default async function DashboardPage() {
       {stats.total === 0 ? (
         <EmptyState title="아직 저장된 표현이 없습니다" body="배운 표현이 생기면 여기에서 바로 복습을 시작할 수 있습니다." actionHref="/expressions" actionLabel="표현 모아보기" />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="hidden gap-3 sm:grid sm:grid-cols-2">
           <Link href="/expressions" className="btn-secondary flex min-h-16">표현 모아보기</Link>
-          <Link href="/memorize" className="btn-primary flex min-h-16">암기하기</Link>
           <Link href="/questions" className="btn-ghost flex min-h-16 items-center justify-center">질문거리</Link>
         </div>
       )}
@@ -66,19 +65,6 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
-      {queue.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-xl font-black text-ink">다음 학습 후보</h2>
-          <div className="space-y-3">
-            {queue.map((expression) => (
-              <Link key={expression.id} href={`/expressions/${expression.id}`} className="block rounded-3xl bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-3"><h3 className="font-black text-ink">{expression.korean_prompt}</h3><span className="text-xs font-bold text-amber-700">모름 {expression.unknown_count}</span></div>
-                <p className="mt-2 line-clamp-2 text-sm text-slate-600">{expression.english}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }
