@@ -25,10 +25,8 @@ export default async function ExpressionDetailPage({ params }: { params: Params 
         <p className="text-lg font-semibold leading-7 text-slate-700">{expression.korean_prompt}</p>
       </div>
       <div className="space-y-4">
-        {expression.nuance_note ? <InfoBlock title="느낌 / 뉘앙스" body={expression.nuance_note} /> : null}
-        {expression.structure_note ? <InfoBlock title="구조" body={expression.structure_note} /> : null}
-        {expression.grammar_note ? <InfoBlock title="문법 / 수업 메모" body={expression.grammar_note} /> : null}
-        {expression.examples.length > 0 ? <section className="rounded-3xl bg-white p-5 shadow-card"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">예문</h2><ul className="mt-3 space-y-3">{expression.examples.map((example) => <li key={example.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-ink">{example.example_text}</p>{example.meaning_ko ? <p className="mt-1 text-sm text-slate-600">{example.meaning_ko}</p> : null}</li>)}</ul></section> : null}
+        {expression.grammar_note ? <InfoBlock title="패턴" body={expression.grammar_note} /> : null}
+        {expression.examples.length > 0 ? <section className="rounded-3xl bg-white p-5 shadow-card"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">비슷한 표현</h2><ul className="mt-3 space-y-3">{expression.examples.map((example) => <li key={example.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-ink">{example.example_text}</p>{example.meaning_ko ? <p className="mt-1 text-sm text-slate-600">{example.meaning_ko}</p> : null}</li>)}</ul></section> : null}
       </div>
       <ExpressionMemoForm expression={expression} />
     </div>

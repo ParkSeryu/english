@@ -10,13 +10,15 @@ type QuestionStatus = "open" | "asked";
 
 type ExpressionIngestionPayload = {
   expression_day: { title: string; day_date: string; raw_input: string };
-  expressions: Array<{ english: string; korean_prompt: string; grammar_note?: string; nuance_note?: string }>;
+  expressions: Array<{ english: string; korean_prompt: string; grammar_note?: string; nuance_note?: string; structure_note?: string }>;
 };
 
 type ExpressionCard = {
   id: string;
   english: string;
   korean_prompt: string;
+  nuance_note: string | null;
+  structure_note: string | null;
   unknown_count: number;
   known_count: number;
   review_count: number;
@@ -91,13 +93,14 @@ describe("MemoryExpressionStore daily expression behavior", () => {
 
     const revised = await store.reviseDraft(draft.id, {
       ...payload,
-      expressions: [{ ...payload.expressions[0], nuance_note: "원문 답은 바꾸지 말고 메모만 추가한다." }]
+      expressions: [{ ...payload.expressions[0], nuance_note: "원문 답은 바꾸지 말고 메모만 추가한다.", structure_note: "주어 + 동사" }]
     });
     expect(revised.status).toBe("revised");
 
     const approved = await store.approveDraft(draft.id, "이대로 앱에 넣어줘");
     expect(approved.expressionDay).toMatchObject({ owner_id: userA.id, day_date: "2026-04-27" });
     expect(approved.expressionDay.expressions).toHaveLength(1);
+    expect(approved.expressionDay.expressions[0]).toMatchObject({ nuance_note: null, structure_note: null });
     expect(approved.expressionUrls[0]).toMatch(/^\/expressions\//);
   });
 

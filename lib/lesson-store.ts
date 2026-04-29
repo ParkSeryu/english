@@ -66,6 +66,19 @@ function assertPayload(payload: ExpressionIngestionPayload) {
   return expressionIngestionPayloadSchema.parse(payload);
 }
 
+function normalizeGrammarNote(note: string | null | undefined) {
+  const value = String(note ?? "").trim();
+  if (!value) return null;
+
+  const lowerValue = value.toLowerCase();
+  const routineExplanationPattern = /(현재시제|과거시제|미래시제|현재의\s*일반적인\s*사실|일반적인\s*사실|체질|문맥상|암기|원문\s*그대로|present tense|past tense|future tense|context)/i;
+  if (routineExplanationPattern.test(lowerValue)) return null;
+
+  const firstLine = value.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
+  if (!firstLine || firstLine.length > 80) return null;
+  return firstLine;
+}
+
 function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
   const { expression_examples: examples, expression_days, ...expression } = row;
   return {
@@ -343,33 +356,55 @@ class SupabaseExpressionStore implements ExpressionStore {
     const supabase = await this.supabase();
     const timestamp = nowIso();
     let dayId: string | null = null;
+    let createdDayId: string | null = null;
     try {
-      const { data: dayRow, error: dayError } = await supabase
-        .from("expression_days")
-        .insert({
-          owner_id: this.user.id,
-          title: run.normalized_payload.expression_day.title,
-          raw_input: run.normalized_payload.expression_day.raw_input,
-          source_note: run.normalized_payload.expression_day.source_note ?? null,
-          day_date: run.normalized_payload.expression_day.day_date ?? null,
-          created_by: "llm",
-          updated_at: timestamp
-        })
-        .select("*")
-        .single();
-      if (dayError) throw dayError;
-      dayId = dayRow.id as string;
+      const requestedDayDate = run.normalized_payload.expression_day.day_date ?? null;
+      if (requestedDayDate) {
+        const { data: existingDay, error: existingDayError } = await supabase
+          .from("expression_days")
+          .select("id")
+          .eq("owner_id", this.user.id)
+          .eq("day_date", requestedDayDate)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (existingDayError) throw existingDayError;
+        dayId = (existingDay?.id as string | undefined) ?? null;
+      }
+
+      if (!dayId) {
+        const { data: dayRow, error: dayError } = await supabase
+          .from("expression_days")
+          .insert({
+            owner_id: this.user.id,
+            title: run.normalized_payload.expression_day.title,
+            raw_input: run.normalized_payload.expression_day.raw_input,
+            source_note: run.normalized_payload.expression_day.source_note ?? null,
+            day_date: requestedDayDate,
+            created_by: "llm",
+            updated_at: timestamp
+          })
+          .select("*")
+          .single();
+        if (dayError) throw dayError;
+        dayId = dayRow.id as string;
+        createdDayId = dayId;
+      }
+
+      const { data: existingExpressions, error: existingExpressionsError } = await supabase.from("expressions").select("source_order").eq("expression_day_id", dayId);
+      if (existingExpressionsError) throw existingExpressionsError;
+      const sourceOrderOffset = Math.max(-1, ...(existingExpressions ?? []).map((row: { source_order: number | null }) => row.source_order ?? -1)) + 1;
 
       const expressionRows = run.normalized_payload.expressions.map((card, index) => ({
         expression_day_id: dayId,
         owner_id: this.user.id,
         english: card.english,
         korean_prompt: card.korean_prompt,
-        nuance_note: card.nuance_note ?? null,
-        structure_note: card.structure_note ?? null,
-        grammar_note: card.grammar_note ?? null,
+        nuance_note: null,
+        structure_note: null,
+        grammar_note: normalizeGrammarNote(card.grammar_note),
         user_memo: null,
-          source_order: index,
+          source_order: sourceOrderOffset + index,
           updated_at: timestamp
       }));
       const { data: insertedExpressions, error: expressionError } = await supabase.from("expressions").insert(expressionRows).select("*");
@@ -393,9 +428,9 @@ class SupabaseExpressionStore implements ExpressionStore {
       if (runError) throw runError;
 
       const expressionDay = requireEntity(await this.getExpressionDay(dayId), "Saved expression day not found");
-      return { expressionDay, expressionUrls: expressionDay.expressions.map(expressionUrl) };
+      return { expressionDay, expressionUrls: (insertedExpressions ?? []).map((card: ExpressionCard) => expressionUrl(card)) };
     } catch (error) {
-      if (dayId) await supabase.from("expression_days").delete().eq("id", dayId).eq("owner_id", this.user.id);
+      if (createdDayId) await supabase.from("expression_days").delete().eq("id", createdDayId).eq("owner_id", this.user.id);
       await supabase
         .from("ingestion_runs")
         .update({ status: "failed", error_message: error instanceof Error ? error.message : "Unknown ingestion error", updated_at: nowIso() })
@@ -570,55 +605,66 @@ export class MemoryExpressionStore implements ExpressionStore {
     if (run.status === "inserted") throw new Error("이미 저장된 드래프트입니다.");
 
     const timestamp = nowIso();
-    const dayId = randomUUID();
-    const expressionDay: ExpressionDay = {
-      id: dayId,
-      owner_id: this.user.id,
-      title: run.normalized_payload.expression_day.title,
-      raw_input: run.normalized_payload.expression_day.raw_input,
-      source_note: run.normalized_payload.expression_day.source_note ?? null,
-      day_date: run.normalized_payload.expression_day.day_date ?? null,
-      created_by: "llm",
-      created_at: timestamp,
-      updated_at: timestamp,
-      expressions: run.normalized_payload.expressions.map((cardInput, index) => {
-        const expressionId = randomUUID();
-        return {
-          id: expressionId,
-          expression_day_id: dayId,
-          owner_id: this.user.id,
-          english: cardInput.english,
-          korean_prompt: cardInput.korean_prompt,
-          nuance_note: cardInput.nuance_note ?? null,
-          structure_note: cardInput.structure_note ?? null,
-          grammar_note: cardInput.grammar_note ?? null,
-          user_memo: null,
-          source_order: index,
-          known_count: 0,
-          unknown_count: 0,
-          review_count: 0,
-          last_result: null,
-          last_reviewed_at: null,
-          created_at: timestamp,
-          updated_at: timestamp,
-          examples: (cardInput.examples ?? []).map((exampleInput, exampleIndex) => ({
-            id: randomUUID(),
-            expression_id: expressionId,
-            example_text: exampleInput.example_text,
-            meaning_ko: exampleInput.meaning_ko ?? null,
-            source: exampleInput.source ?? "llm",
-            sort_order: exampleIndex,
-            created_at: timestamp
-          }))
-        };
-      })
-    };
+    const requestedDayDate = run.normalized_payload.expression_day.day_date ?? null;
+    let expressionDay = requestedDayDate
+      ? memoryState().expressionDays.find((day) => day.owner_id === this.user.id && day.day_date === requestedDayDate)
+      : undefined;
 
-    memoryState().expressionDays.unshift(expressionDay);
+    if (!expressionDay) {
+      expressionDay = {
+        id: randomUUID(),
+        owner_id: this.user.id,
+        title: run.normalized_payload.expression_day.title,
+        raw_input: run.normalized_payload.expression_day.raw_input,
+        source_note: run.normalized_payload.expression_day.source_note ?? null,
+        day_date: requestedDayDate,
+        created_by: "llm",
+        created_at: timestamp,
+        updated_at: timestamp,
+        expressions: []
+      };
+      memoryState().expressionDays.unshift(expressionDay);
+    }
+
+    const sourceOrderOffset = Math.max(-1, ...expressionDay.expressions.map((card) => card.source_order)) + 1;
+    const insertedExpressions = run.normalized_payload.expressions.map((cardInput, index) => {
+      const expressionId = randomUUID();
+      return {
+        id: expressionId,
+        expression_day_id: expressionDay.id,
+        owner_id: this.user.id,
+        english: cardInput.english,
+        korean_prompt: cardInput.korean_prompt,
+        nuance_note: null,
+        structure_note: null,
+        grammar_note: normalizeGrammarNote(cardInput.grammar_note),
+        user_memo: null,
+        source_order: sourceOrderOffset + index,
+        known_count: 0,
+        unknown_count: 0,
+        review_count: 0,
+        last_result: null,
+        last_reviewed_at: null,
+        created_at: timestamp,
+        updated_at: timestamp,
+        examples: (cardInput.examples ?? []).map((exampleInput, exampleIndex) => ({
+          id: randomUUID(),
+          expression_id: expressionId,
+          example_text: exampleInput.example_text,
+          meaning_ko: exampleInput.meaning_ko ?? null,
+          source: exampleInput.source ?? "llm",
+          sort_order: exampleIndex,
+          created_at: timestamp
+        }))
+      };
+    });
+
+    expressionDay.expressions.push(...insertedExpressions);
+    expressionDay.updated_at = timestamp;
     run.status = "inserted";
     run.error_message = null;
     run.updated_at = timestamp;
-    return { expressionDay: cloneExpressionDay(expressionDay), expressionUrls: expressionDay.expressions.map(expressionUrl) };
+    return { expressionDay: cloneExpressionDay(expressionDay), expressionUrls: insertedExpressions.map(expressionUrl) };
   }
 
   async getIngestionRun(id: string) {

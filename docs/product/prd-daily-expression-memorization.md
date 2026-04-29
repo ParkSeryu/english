@@ -130,10 +130,11 @@ MVP behavior:
 
 - LLM/admin ingestion is the only supported path for creating shared expression content in this MVP.
 - LLM parses the simple daily expression text format.
-- LLM shows a preview table with date, English, Korean, and suggested point.
+- LLM shows a lightweight preview with date, English, Korean, optional similar expression, and optional one-line grammar.
 - User can revise through multiple turns.
 - Save happens only after explicit approval such as `이대로 앱에 넣어줘`, `저장해`, `추가해`.
 - Non-approval feedback such as `좋네`, `예문 좀 바꿔줘`, `이 문장 자연스러워?` must not insert.
+- Cards should stay compact: main English + Korean first, optional `비슷한 표현`, and optional `문법` only when useful. Avoid routine nuance/structure paragraphs.
 - The API remains bearer-token gated; `INGESTION_OWNER_ID` is an audit/import owner, not a visibility boundary.
 - Only configured ingestion/admin actors can create or update shared expression content. Normal authenticated learners can read approved shared content and manage only their own progress/question rows. Admin identity is controlled by server-side configuration, not a client-provided `owner_id`.
 

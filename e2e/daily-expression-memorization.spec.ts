@@ -11,7 +11,7 @@ test("mobile user memorizes a daily expression, marks unknown, and adds a questi
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expect(page.getByRole("link", { name: /암기 시작/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /학습 시작/ })).toBeVisible();
   await expect(page.getByText("오늘의 영어표현")).toBeVisible();
 
   await page.getByRole("link", { name: /^표현$/ }).click();
@@ -26,7 +26,7 @@ test("mobile user memorizes a daily expression, marks unknown, and adds a questi
 
   await page.getByRole("button", { name: /정답 보기/ }).click();
   await expect(page.getByText("The birth rate in Korea is decreasing.")).toBeVisible();
-  await expect(page.getByText(/decrease는 '감소하다'/)).toBeVisible();
+  await expect(page.getByText("is decreasing = 감소하고 있다")).toBeVisible();
   await page.getByRole("button", { name: /모름/ }).click();
   await expect(page.getByText("저는 먹지 않으려고 노력해요.")).toBeVisible();
   await expect(page.getByText("I try not to eat.")).toHaveCount(0);

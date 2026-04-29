@@ -11,7 +11,7 @@ test("mobile user can memorize an LLM-approved expression and mark unknown", asy
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expect(page.getByRole("link", { name: /오늘 암기 시작/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /학습 시작/ })).toBeVisible();
   await expect(page.getByText("have to / be used to")).toBeVisible();
 
   await page.getByRole("link", { name: /^표현$/ }).click();

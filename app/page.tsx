@@ -42,10 +42,10 @@ export default async function DashboardPage() {
       </section>
 
       {stats.total === 0 ? (
-        <EmptyState title="아직 저장된 표현이 없습니다" body="LLM에게 수업 내용을 말하고 초안을 확인한 뒤 '이대로 앱에 넣어줘'처럼 명시적으로 승인하면 표현이 저장됩니다." actionHref="/expressions" actionLabel="표현 보관함 보기" />
+        <EmptyState title="아직 저장된 표현이 없습니다" body="배운 표현이 생기면 여기에서 바로 복습을 시작할 수 있습니다." actionHref="/expressions" actionLabel="표현 모아보기" />
       ) : (
         <div className="grid gap-3 sm:grid-cols-3">
-          <Link href="/expressions" className="btn-secondary flex min-h-16">표현 보기</Link>
+          <Link href="/expressions" className="btn-secondary flex min-h-16">표현 모아보기</Link>
           <Link href="/memorize" className="btn-primary flex min-h-16">암기하기</Link>
           <Link href="/questions" className="btn-ghost flex min-h-16 items-center justify-center">질문거리</Link>
         </div>
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
               <Link key={day.id} href={`/expressions?day=${day.id}`} className="block rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-card">
                 <p className="text-xs font-bold uppercase tracking-wide text-teal-700">{day.day_date ?? "날짜 없음"}</p>
                 <h3 className="mt-2 text-xl font-black text-ink">{day.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">표현 {day.expressions.length}개 · {day.source_note ?? "LLM 정리"}</p>
+                <p className="mt-2 text-sm text-slate-600">표현 {day.expressions.length}개 · {day.source_note ?? "학습 노트"}</p>
               </Link>
             ))}
           </div>

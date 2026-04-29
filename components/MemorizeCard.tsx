@@ -31,15 +31,12 @@ export function MemorizeCard({ expression, returnTo = "/memorize", onReviewSubmi
           </div>
           <div className="mt-5 space-y-4" aria-live="polite">
             <section className="rounded-3xl bg-slate-50 p-4">
-              <h2 className="text-sm font-black uppercase tracking-wide text-slate-500">한국어 프롬프트</h2>
-              <p className="mt-2 whitespace-pre-wrap text-lg font-semibold text-ink">{expression.korean_prompt}</p>
+              <p className="whitespace-pre-wrap text-lg font-semibold text-ink">{expression.korean_prompt}</p>
             </section>
-            {expression.nuance_note ? <Info title="느낌 / 뉘앙스" body={expression.nuance_note} /> : null}
-            {expression.structure_note ? <Info title="구조" body={expression.structure_note} /> : null}
-            {expression.grammar_note ? <Info title="문법 / 수업 메모" body={expression.grammar_note} /> : null}
+            {expression.grammar_note ? <Info title="패턴" body={expression.grammar_note} /> : null}
             {expression.examples.length > 0 ? (
               <section className="rounded-3xl bg-slate-50 p-4">
-                <h2 className="text-sm font-black uppercase tracking-wide text-slate-500">예문</h2>
+                <h2 className="text-sm font-black uppercase tracking-wide text-slate-500">비슷한 표현</h2>
                 <ul className="mt-2 space-y-2">
                   {expression.examples.map((example) => (
                     <li key={example.id} className="rounded-2xl bg-white p-3 text-slate-700">
