@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { AppNav } from "@/components/AppNav";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
@@ -72,6 +73,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <AppNav user={user} />
         <main className="mx-auto min-h-[calc(100vh-64px)] max-w-3xl px-4 pb-28 pt-6 sm:py-8">{children}</main>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
