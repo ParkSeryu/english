@@ -26,7 +26,7 @@ export default async function ExpressionsPage({ searchParams }: { searchParams: 
                 <Link key={expression.id} href={`/expressions/${expression.id}`} className="block rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-card">
                   <div className="flex items-start justify-between gap-3"><h3 className="text-xl font-black text-ink">{expression.english}</h3><span className="shrink-0 text-xs font-semibold text-slate-500">모름 {expression.unknown_count}</span></div>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{expression.korean_prompt}</p>
-                  {expression.grammar_note ? <p className="mt-3 text-sm leading-6 text-slate-700"><span className="font-black text-slate-500">패턴</span> {expression.grammar_note}</p> : null}
+                  {expression.grammar_note ? <p className="mt-3 text-sm leading-6 text-slate-700"><span className="font-black text-slate-500">문법/패턴</span> {expression.grammar_note}</p> : null}
                   {expression.examples.length > 0 ? (
                     <div className="mt-3 space-y-1 rounded-2xl bg-slate-50 p-3 text-sm leading-6 text-slate-700">
                       <p className="font-black text-slate-500">비슷한 표현</p>

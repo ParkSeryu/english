@@ -33,7 +33,7 @@ export function MemorizeCard({ expression, returnTo = "/memorize", onReviewSubmi
             <section className="rounded-3xl bg-slate-50 p-4">
               <p className="whitespace-pre-wrap text-lg font-semibold text-ink">{expression.korean_prompt}</p>
             </section>
-            {expression.grammar_note ? <Info title="패턴" body={expression.grammar_note} /> : null}
+            {expression.grammar_note ? <Info title="문법/패턴" body={expression.grammar_note} /> : null}
             {expression.examples.length > 0 ? (
               <section className="rounded-3xl bg-slate-50 p-4">
                 <h2 className="text-sm font-black uppercase tracking-wide text-slate-500">비슷한 표현</h2>
