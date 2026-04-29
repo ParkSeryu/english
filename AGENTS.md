@@ -10,6 +10,15 @@ This repo follows the workspace-level OMX/autonomous-agent instructions. The fol
 - Preserve existing behavior and placement by default; only alter behavior that is directly required by the latest user instruction.
 - When correcting a mistaken change, restore the previous behavior exactly unless the user gives a new replacement direction.
 
+## Working tree isolation on request
+
+- If the user explicitly asks to proceed with a separated working tree, create or use a separate `git worktree` before making task changes.
+- Do not mix that requested work with the current working tree's uncommitted edits; keep the isolated worktree on its own branch/path and report the path being used.
+- If a separate worktree cannot be created or used, stop before task edits and report the blocker instead of continuing in the original tree.
+- When integrating separated work, merge or raise the PR toward the `dev` branch by default. Do not target `main`, `origin/main`, or a release branch unless the user explicitly says so.
+- Only target `main` when the user explicitly instructs to put the work on `main`; otherwise keep integration directed at `dev`.
+- Before any merge/push handoff, state the source branch/worktree and confirm the target branch is `dev`.
+
 ## Mandatory end-of-task working gate
 
 Before reporting any implementation, UI, route, server action, schema, or runtime-affecting task as complete:
