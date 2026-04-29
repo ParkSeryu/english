@@ -2,7 +2,11 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { MissingSupabaseEnvError, hasSupabaseEnv } from "@/lib/env";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isInvalidRefreshTokenError } from "@/lib/supabase/auth-cookie";
+import {
+  clearServerSupabaseAuthCookies,
+  createServerSupabaseClient
+} from "@/lib/supabase/server";
 import { getE2EFakeUserId } from "@/lib/test-mode";
 import type { UserIdentity } from "@/lib/types";
 
@@ -17,10 +21,20 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Use
   try {
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) return null;
+    if (error) {
+      if (isInvalidRefreshTokenError(error)) {
+        await clearServerSupabaseAuthCookies();
+      }
+      return null;
+    }
+    if (!data.user) return null;
     return { id: data.user.id, email: data.user.email };
   } catch (error) {
     if (error instanceof MissingSupabaseEnvError) return null;
+    if (isInvalidRefreshTokenError(error)) {
+      await clearServerSupabaseAuthCookies();
+      return null;
+    }
     throw error;
   }
 });

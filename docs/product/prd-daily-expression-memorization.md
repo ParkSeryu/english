@@ -2,6 +2,7 @@
 
 ## Status
 
+- Canonical PRD: this document drives the next build direction. Superseded docs are retained for history only and must not drive new implementation.
 - Supersedes: `docs/product/prd-english-review-app-llm-ingestion.md` for the next build direction.
 - Rollback checkpoints:
   - `18440a0` previous card MVP checkpoint.
@@ -52,9 +53,10 @@ LLM parses this into a dated expression day and sentence cards. It may add short
 ### Shared daily expression days
 
 - Store date-based groups such as `오늘의 영어표현 (20260427)` once as shared content.
-- Normalize compact dates like `260427` or `20260427` to `2026-04-27` when clear.
+- Normalize compact dates like `260427` or `20260427` to `2026-04-27` when clear. Six-digit dates are parsed as `YYMMDD` and mapped to `20YY-MM-DD` for MVP; reject invalid or ambiguous dates instead of guessing silently.
 - Show expression count from shared content and review progress from the current learner's private state.
 - Any signed-in learner can read approved expression days; normal app users do not create/edit shared content through the UI.
+- Approved content is the only learner-visible shared content. Drafts remain in `ingestion_runs` or another non-learner-visible draft store until explicit approval.
 
 ### Expression cards
 
@@ -67,8 +69,8 @@ Each expression card supports:
 - Optional source order within the set.
 - Shared expression content fields only; no learner-specific review counters live on the shared expression row.
 - Per-learner progress fields live in `expression_progress`:
-  - `unknown_count`
-  - `known_count`
+  - `unknown_count` as cumulative wrong-attempt count across review sessions
+  - `known_count` as cumulative correct-attempt count across review sessions
   - `review_count`
   - `last_reviewed_at`
   - `last_result` = `known | unknown | null`
@@ -81,8 +83,8 @@ Each expression card supports:
 - After reveal, user chooses:
   - `맞췄음`
   - `모름`
-- `모름` marks the current learner's state as unknown (`unknown_count: 1`, `known_count: 0`) and makes the card appear more frequently for that learner; repeated taps on the same expression do not stack beyond 1.
-- `맞췄음` marks the current learner's state as known (`known_count: 1`, `unknown_count: 0`) and removes the card from that learner's memorize queue for 24 hours.
+- `모름` marks the current learner's latest state as unknown, increments `unknown_count` once for that review session, and makes the card appear more frequently for that learner. Repeated taps on the same revealed card must not stack multiple increments.
+- `맞췄음` marks the current learner's latest state as known, increments `known_count` once for that review session, clears immediate unknown priority through `last_result = known`, and removes the card from that learner's memorize queue for 24 hours.
 
 ### MVP review scheduling
 
@@ -113,6 +115,8 @@ Question note MVP fields:
 - `question_text` text.
 - `status` = `open | asked`.
 - Optional `answer_note`.
+- Optional `expression_day_id` link for context.
+- Optional `expression_id` link for expression-specific questions.
 - `created_at`, `updated_at`.
 
 MVP behavior:
@@ -131,6 +135,7 @@ MVP behavior:
 - Save happens only after explicit approval such as `이대로 앱에 넣어줘`, `저장해`, `추가해`.
 - Non-approval feedback such as `좋네`, `예문 좀 바꿔줘`, `이 문장 자연스러워?` must not insert.
 - The API remains bearer-token gated; `INGESTION_OWNER_ID` is an audit/import owner, not a visibility boundary.
+- Only configured ingestion/admin actors can create or update shared expression content. Normal authenticated learners can read approved shared content and manage only their own progress/question rows. Admin identity is controlled by server-side configuration, not a client-provided `owner_id`.
 
 ## Out of Scope
 
@@ -142,6 +147,7 @@ MVP behavior:
 - Gamified scores, rankings, streaks.
 - Calendar/class management.
 - Bulk destructive edits from LLM.
+- Learner-created shared content through normal mobile UI.
 
 ## Proposed Data Model
 
@@ -155,6 +161,9 @@ The MVP separates **shared study content** from **private learner state**.
 - `day_date date`
 - `raw_input text not null`
 - `created_by text not null default 'llm' check in ('llm', 'user')`
+- `status text not null default 'approved' check in ('draft', 'approved', 'archived')`; learner queries should only return `approved` rows
+- `approved_at timestamptz`
+- `approved_by uuid references auth.users(id)`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 - RLS: authenticated users can read; writes are not exposed to normal app users. Service-role ingestion inserts approved shared content.
@@ -170,6 +179,7 @@ The MVP separates **shared study content** from **private learner state**.
 - `nuance_note text`
 - `structure_note text`
 - `source_order int not null default 0`
+- `original_english text` optional source-preservation field when the approved answer differs from the raw input sentence
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 - RLS: authenticated users can read all approved expressions; per-user counters are not stored here.
@@ -204,6 +214,8 @@ The MVP separates **shared study content** from **private learner state**.
 - `id uuid primary key`
 - `owner_id uuid not null references auth.users(id)`
 - `question_text text not null`
+- `expression_day_id uuid references expression_days(id) on delete set null`
+- `expression_id uuid references expressions(id) on delete set null`
 - `status text not null default 'open' check in ('open', 'asked')`
 - `answer_note text`
 - `created_at timestamptz not null default now()`
@@ -222,15 +234,22 @@ Reuse or adapt the existing ingestion run concept, but `normalized_payload` shou
 - CTA: `암기 시작`.
 - Counts: total expressions, unknown total, known total, open questions.
 
-### `/expressions`
+### `/expression-days`
 
 - Daily expression days by date.
 - Each card shows date, title, expression count, unknown count.
+
+### `/expression-days/[id]`
+
+- One daily expression bundle.
+- Lists all expressions in source order with learner progress per expression.
+- CTA: `이 묶음 암기하기`.
 
 ### `/expressions/[id]`
 
 - Single expression detail.
 - Shows English, Korean prompt, grammar/structure/nuance notes, examples, and user memo form.
+- Can start a question note already linked to this expression.
 
 ### `/memorize`
 
@@ -251,10 +270,12 @@ Reuse or adapt the existing ingestion run concept, but `normalized_payload` shou
 2. No expression day is saved before explicit approval.
 3. The app shows date-based expression days.
 4. Memorization shows Korean first and hides English before reveal.
-5. `모름` marks `unknown_count` as 1 without repeated-tap stacking and increases future queue priority.
-6. `맞췄음` marks `known_count` as 1, clears unknown priority, and decreases priority relative to unknown cards.
+5. `모름` increments `unknown_count` once per review session without repeated-tap stacking and increases future queue priority.
+6. `맞췄음` increments `known_count` once per review session, clears immediate unknown priority through `last_result = known`, and decreases priority relative to unknown cards.
 7. Grammar points display as hints/support after reveal or detail.
 8. Questions tab lets the user add and mark class questions.
 9. Supabase RLS lets authenticated users read shared expression content while keeping `expression_progress`, `question_notes`, and `ingestion_runs` scoped to their owner/user.
 10. A second signed-in user can see the same expression bank but starts with zero private counters and no private memo.
 11. Mobile e2e covers the main loop: seeded approved set → memorize → mark unknown → card reprioritized → add question.
+12. If the LLM detects an unnatural English sentence, it preserves the original memorization answer and stores any correction as a note or optional alternative unless the user explicitly approves replacement.
+13. Normal learners cannot create/edit shared expression content through the app UI or by client-provided owner fields; only configured ingestion/admin actors can write approved shared content.

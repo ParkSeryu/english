@@ -14,14 +14,14 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "영어 표현 암기",
-  description: "매일 배운 영어 문장을 한국어 프롬프트로 떠올리는 암기 앱.",
-  applicationName: "영어 표현 암기",
+  title: "영어공부",
+  description: "매일 배운 영어 표현을 꾸준히 익히는 영어공부 앱.",
+  applicationName: "영어공부",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "영어암기"
+    title: "영어공부"
   },
   formatDetection: {
     telephone: false
@@ -34,16 +34,16 @@ export const metadata: Metadata = {
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
   },
   openGraph: {
-    title: "영어 표현 암기",
-    description: "한국어만 보고 영어 문장을 떠올리는 개인 영어 표현 암기 앱.",
+    title: "영어공부",
+    description: "매일 배운 표현을 다시 보고 익히는 개인 영어공부 앱.",
     url: "/",
-    siteName: "영어 표현 암기",
+    siteName: "영어공부",
     images: [
       {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "영어 표현 암기 앱 미리보기"
+        alt: "영어공부 앱 미리보기"
       }
     ],
     locale: "ko_KR",
@@ -51,8 +51,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "영어 표현 암기",
-    description: "한국어만 보고 영어 문장을 떠올리는 개인 영어 표현 암기 앱.",
+    title: "영어공부",
+    description: "매일 배운 표현을 다시 보고 익히는 개인 영어공부 앱.",
     images: ["/opengraph-image"]
   }
 };

@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "영어 표현 암기 앱 미리보기";
+export const alt = "영어공부 앱 미리보기";
 export const size = {
   width: 1200,
   height: 630
@@ -37,12 +37,12 @@ export default function Image() {
           }}
         >
           <div style={{ color: "#5eead4", fontSize: 30, fontWeight: 900, letterSpacing: 4 }}>
-            ENGLISH RECALL
+            ENGLISH STUDY
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            <div style={{ fontSize: 76, fontWeight: 900, lineHeight: 1.08 }}>오늘 배운 표현, 바로 외우기</div>
+            <div style={{ fontSize: 76, fontWeight: 900, lineHeight: 1.08 }}>오늘 배운 표현, 꾸준히 공부하기</div>
             <div style={{ color: "#cbd5e1", fontSize: 34, fontWeight: 700, lineHeight: 1.35 }}>
-              한국어만 보고 영어 문장을 떠올리는 암기 앱
+              매일 배운 영어 표현을 다시 익히는 공부 앱
             </div>
           </div>
           <div style={{ display: "flex", gap: 18 }}>

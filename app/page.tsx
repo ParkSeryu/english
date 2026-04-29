@@ -14,9 +14,10 @@ export default async function DashboardPage() {
     return (
       <div className="space-y-6">
         <section className="rounded-[2rem] bg-ink p-6 text-white shadow-card">
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-200">English Recall</p>
-          <h1 className="mt-3 text-3xl font-black leading-tight">오늘 배운 표현, 바로 외우기</h1>
-          <Link href="/login" className="mt-6 inline-flex rounded-full bg-white px-5 py-3 font-black text-ink">시작하기</Link>
+          <p className="inline-flex rounded-full bg-white/10 px-3 py-1 text-sm font-extrabold text-teal-100">오늘의 학습</p>
+          <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.03em]">배운 표현,<br />바로 외우기</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-200">오늘 배운 영어 표현을 가볍게 저장하고 다시 떠올려 보세요.</p>
+          <Link href="/login" className="mt-6 inline-flex rounded-full bg-white px-5 py-3 font-black text-ink shadow-lg shadow-black/10">시작하기</Link>
         </section>
         {!hasSupabaseEnv() ? <EnvWarning /> : null}
       </div>
@@ -29,16 +30,15 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] bg-ink p-6 text-white shadow-card">
-        <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-200">오늘의 암기</p>
-        <h1 className="mt-3 text-3xl font-black leading-tight">모르는 표현이 먼저 나오는 암기 큐</h1>
-        <p className="mt-4 text-sm leading-6 text-slate-200">한국어 프롬프트를 먼저 보고 영어 정답은 숨깁니다. 맞췄음/모름 기록만으로 단순하게 우선순위를 정합니다.</p>
-        <div className="mt-6 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+        <p className="inline-flex rounded-full bg-white/10 px-3 py-1 text-sm font-extrabold text-teal-100">오늘의 학습</p>
+        <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.03em]">배운 표현,<br />바로 외우기</h1>
+        <Link href="/memorize" className="mt-6 flex min-h-14 items-center justify-center rounded-full bg-teal-500 px-5 py-3 text-base font-black text-white shadow-lg shadow-teal-950/30 transition hover:bg-teal-400">학습 시작</Link>
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="표현" value={stats.total} />
           <StatCard label="미확인" value={stats.unseenCount} />
           <StatCard label="맞춤" value={stats.knownReviews} />
           <StatCard label="모름" value={stats.unknownReviews} />
         </div>
-        <Link href="/memorize" className="btn-primary mt-6 flex min-h-16 text-lg">오늘 암기 시작</Link>
       </section>
 
       {stats.total === 0 ? (
@@ -68,7 +68,7 @@ export default async function DashboardPage() {
 
       {queue.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="text-xl font-black text-ink">다음 암기 후보</h2>
+          <h2 className="text-xl font-black text-ink">다음 학습 후보</h2>
           <div className="space-y-3">
             {queue.map((expression) => (
               <Link key={expression.id} href={`/expressions/${expression.id}`} className="block rounded-3xl bg-white p-4 shadow-sm">
@@ -84,7 +84,12 @@ export default async function DashboardPage() {
 }
 
 function StatCard({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-3xl bg-white/10 p-3"><div className="text-2xl font-black">{value}</div><div className="text-xs font-bold uppercase tracking-wide text-slate-300">{label}</div></div>;
+  return (
+    <div className="rounded-3xl bg-white/10 p-4 text-white ring-1 ring-white/10">
+      <div className="text-2xl font-black">{value}</div>
+      <div className="mt-1 text-sm font-bold text-slate-300">{label}</div>
+    </div>
+  );
 }
 function EnvWarning() {
   return <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">Supabase 환경 변수가 아직 설정되지 않았습니다. 로컬 사용은 `.env.example`을 `.env.local`로 복사해 설정하세요.</div>;
