@@ -133,6 +133,32 @@ export async function resetPasswordAction(_previousState: ActionState, formData:
   return { ok: true, message: "비밀번호 재설정 메일을 보냈습니다. 메일함을 확인해 주세요." };
 }
 
+export async function updatePasswordAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (password.length < 6) return { ok: false, message: "새 비밀번호는 6자 이상이어야 합니다." };
+  if (password !== confirmPassword) return { ok: false, message: "비밀번호 확인이 일치하지 않습니다." };
+
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      return { ok: false, message: "재설정 링크가 만료되었거나 세션을 확인할 수 없습니다. 메일 링크를 다시 열어 주세요." };
+    }
+
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return { ok: false, message: error.message };
+
+    await supabase.auth.signOut();
+  } catch (error) {
+    return errorState(error);
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true, message: "비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요." };
+}
+
 export async function signOutAction() {
   const supabase = await createServerSupabaseClient();
   await supabase.auth.signOut();

@@ -48,6 +48,6 @@ describe("site URL resolution", () => {
         VERCEL_PROJECT_PRODUCTION_URL: undefined,
         VERCEL_URL: undefined
       })
-    ).toBe("https://english.example/auth/callback?next=/login");
+    ).toBe("https://english.example/auth/callback?next=/auth/update-password");
   });
 });
