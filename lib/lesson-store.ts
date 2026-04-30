@@ -55,6 +55,12 @@ type QuestionStats = Pick<QuestionNote, "status">;
 
 const EXPRESSION_CARD_COLUMNS = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at";
 const EXPRESSION_STATS_COLUMNS = "id, known_count, unknown_count, review_count, last_result, last_reviewed_at, source_order, created_at";
+const EXPRESSION_DAY_COLUMNS = "id,owner_id,title,raw_input,source_note,day_date,folder_id,created_by,created_at,updated_at";
+const LEGACY_EXPRESSION_DAY_COLUMNS = "id,owner_id,title,raw_input,source_note,day_date,created_by,created_at,updated_at";
+const EXPRESSION_DAY_WITH_CARDS_SELECT = `${EXPRESSION_DAY_COLUMNS},expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))`;
+const LEGACY_EXPRESSION_DAY_WITH_CARDS_SELECT = `${LEGACY_EXPRESSION_DAY_COLUMNS},expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))`;
+const EXPRESSION_WITH_DAY_SELECT = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,title,source_note,day_date,folder_id)";
+const LEGACY_EXPRESSION_WITH_DAY_SELECT = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,title,source_note,day_date)";
 
 export interface ExpressionStore {
   listExpressionDays(): Promise<ExpressionDay[]>;
@@ -104,6 +110,29 @@ function normalizeGrammarNote(note: string | null | undefined) {
   const compactNote = lines.slice(0, 4).join("\n");
   if (compactNote.length > 240) return null;
   return compactNote;
+}
+
+function isFolderSchemaUnavailableError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "";
+  const text = [candidate.message, candidate.details, candidate.hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    ["42703", "42P01", "42883", "PGRST200", "PGRST204", "PGRST202"].includes(code)
+    || text.includes("folder_id")
+    || text.includes("content_folders")
+    || text.includes("can_read_content_folder")
+    || text.includes("schema cache")
+  );
+}
+
+function logFolderSchemaFallback(scope: string, error: unknown) {
+  const message = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String((error as { message?: unknown }).message) : String(error);
+  console.warn(`[topic-folder-access] ${scope}: folder schema unavailable, falling back to legacy read`, message);
 }
 
 function normalizeFolder(summary: unknown): ContentFolderSummary | null {
@@ -252,7 +281,13 @@ class SupabaseExpressionStore implements ExpressionStore {
       .from("content_folders")
       .select("id,name,slug,parent_id,path_names")
       .in("id", uniqueFolderIds);
-    if (error) throw error;
+    if (error) {
+      if (isFolderSchemaUnavailableError(error)) {
+        logFolderSchemaFallback("foldersForIds", error);
+        return new Map<string, ContentFolderSummary>();
+      }
+      throw error;
+    }
 
     return new Map((data ?? []).map((row) => {
       const folder = normalizeFolder(row);
@@ -328,13 +363,21 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   async listExpressionDays() {
     const supabase = await this.supabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("expression_days")
-      .select(
-        "id,owner_id,title,raw_input,source_note,day_date,folder_id,created_by,created_at,updated_at,expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))"
-      )
+      .select(EXPRESSION_DAY_WITH_CARDS_SELECT)
       .order("day_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("listExpressionDays", error);
+      const legacyResult = await supabase
+        .from("expression_days")
+        .select(LEGACY_EXPRESSION_DAY_WITH_CARDS_SELECT)
+        .order("day_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) throw error;
     const days = await this.hydrateExpressionDays((data ?? []).map((row: SupabaseExpressionDayRow) => normalizeExpressionDay(row)));
     const progress = await this.progressFor(days.flatMap((day) => day.expressions.map((card) => card.id)));
@@ -343,13 +386,21 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   async getExpressionDay(id: string) {
     const supabase = await this.supabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("expression_days")
-      .select(
-        "id,owner_id,title,raw_input,source_note,day_date,folder_id,created_by,created_at,updated_at,expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))"
-      )
+      .select(EXPRESSION_DAY_WITH_CARDS_SELECT)
       .eq("id", id)
       .maybeSingle();
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("getExpressionDay", error);
+      const legacyResult = await supabase
+        .from("expression_days")
+        .select(LEGACY_EXPRESSION_DAY_WITH_CARDS_SELECT)
+        .eq("id", id)
+        .maybeSingle();
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) throw error;
     if (!data) return null;
     const [day] = await this.hydrateExpressionDays([normalizeExpressionDay(data as SupabaseExpressionDayRow)]);
@@ -359,13 +410,21 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   async getExpression(id: string) {
     const supabase = await this.supabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("expressions")
-      .select(
-        "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,title,source_note,day_date,folder_id)"
-      )
+      .select(EXPRESSION_WITH_DAY_SELECT)
       .eq("id", id)
       .maybeSingle();
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("getExpression", error);
+      const legacyResult = await supabase
+        .from("expressions")
+        .select(LEGACY_EXPRESSION_WITH_DAY_SELECT)
+        .eq("id", id)
+        .maybeSingle();
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) throw error;
     if (!data) return null;
     const [card] = await this.hydrateExpressionCards([normalizeExpression(data as SupabaseExpressionRow)]);
@@ -374,12 +433,19 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   private async listExpressions() {
     const supabase = await this.supabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("expressions")
-      .select(
-        "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,title,source_note,day_date,folder_id)"
-      )
+      .select(EXPRESSION_WITH_DAY_SELECT)
       .order("source_order", { ascending: true });
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("listExpressions", error);
+      const legacyResult = await supabase
+        .from("expressions")
+        .select(LEGACY_EXPRESSION_WITH_DAY_SELECT)
+        .order("source_order", { ascending: true });
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) throw error;
     return this.applyUserProgress(await this.hydrateExpressionCards((data ?? []).map((row: SupabaseExpressionRow) => normalizeExpression(row))));
   }
@@ -402,12 +468,24 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   private async listRecentExpressionDays(limit: number) {
     if (limit <= 0) return [];
-    const { data, error } = await (await this.supabase())
+    const supabase = await this.supabase();
+    let { data, error } = await supabase
       .from("expression_days")
-      .select(`id,owner_id,title,raw_input,source_note,day_date,folder_id,created_by,created_at,updated_at,expressions(${EXPRESSION_CARD_COLUMNS})`)
+      .select(`${EXPRESSION_DAY_COLUMNS},expressions(${EXPRESSION_CARD_COLUMNS})`)
       .order("day_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(limit);
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("listRecentExpressionDays", error);
+      const legacyResult = await supabase
+        .from("expression_days")
+        .select(`${LEGACY_EXPRESSION_DAY_COLUMNS},expressions(${EXPRESSION_CARD_COLUMNS})`)
+        .order("day_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) throw error;
     const days = await this.hydrateExpressionDays((data ?? []).map((row: SupabaseExpressionDayRow) => normalizeExpressionDay(row)));
     return days.map((day) => {
