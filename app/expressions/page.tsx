@@ -10,10 +10,10 @@ import type { ExpressionDaySummary } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 type ExpressionDayListItem = ExpressionDaySummary & {
-  folder_path?: string[];
+  folder_path?: string | null;
   folderPath?: string | null;
   folder?: {
-    path_names?: string[];
+    path?: string | null;
     name?: string | null;
   };
 };
@@ -79,10 +79,7 @@ function pickSelectedTopicId(days: { id: string }[], requestedId?: string) {
 }
 
 function getFolderPath(day: ExpressionDayListItem): string | null {
-  if (day.folder_path?.length) return day.folder_path.join(" / ");
-  if (day.folderPath) return day.folderPath;
-  if (day.folder?.path_names?.length) return day.folder.path_names.join(" / ");
-  return null;
+  return day.folder_path ?? day.folderPath ?? day.folder?.path ?? null;
 }
 
 function getTopicDepth(day: ExpressionDayListItem): number {
