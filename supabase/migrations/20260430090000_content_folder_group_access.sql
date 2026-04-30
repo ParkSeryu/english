@@ -166,7 +166,7 @@ $$;
 create policy "expression_days_select_authorized" on public.expression_days
 for select
 to authenticated
-using (auth.uid() is not null and public.can_read_content_folder(auth.uid(), id));
+using (auth.uid() is not null and public.can_read_content_folder(auth.uid(), folder_id));
 
 create policy "expressions_select_authorized" on public.expressions
 for select

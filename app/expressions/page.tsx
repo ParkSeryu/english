@@ -10,7 +10,7 @@ import type { ExpressionDay } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 type ExpressionDayListItem = ExpressionDay & {
-  folder_path?: string | null;
+  folder_path?: string[] | string | null;
   folderPath?: string | null;
   folder?: {
     path?: string | null;
@@ -79,6 +79,7 @@ function pickSelectedTopicId(days: { id: string }[], requestedId?: string) {
 }
 
 function getFolderPath(day: ExpressionDayListItem): string | null {
+  if (Array.isArray(day.folder_path)) return day.folder_path.join(" / ");
   return day.folder_path ?? day.folderPath ?? day.folder?.path ?? null;
 }
 
