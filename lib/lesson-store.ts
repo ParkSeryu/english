@@ -162,6 +162,19 @@ function normalizeExpressionDay(row: SupabaseExpressionDayRow): ExpressionDay {
   };
 }
 
+async function resolveDefaultWritableFolder(supabase: SupabaseLike) {
+  const { data, error } = await supabase
+    .from("content_folders")
+    .select("id")
+    .eq("slug", "legacy-root")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("기본 표현 폴더를 찾을 수 없습니다.");
+  return data.id as string;
+}
+
 function normalizeIngestionRun(row: SupabaseIngestionRunRow): IngestionRun {
   return { ...row, normalized_payload: assertPayload(row.normalized_payload as ExpressionIngestionPayload) };
 }
@@ -526,7 +539,6 @@ class SupabaseExpressionStore implements ExpressionStore {
             day_date: requestedDayDate,
             folder_id: defaultFolderId,
             created_by: "llm",
-            folder_id: await resolveDefaultWritableFolder(supabase),
             updated_at: timestamp
           })
           .select("*")
