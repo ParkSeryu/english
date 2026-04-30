@@ -13,6 +13,7 @@ import type {
   ExpressionCard,
   ExpressionDay,
   ExpressionDaySummary,
+  ContentFolderSummary,
   ExpressionExample,
   ExpressionIngestionPayload,
   ExpressionProgress,
@@ -25,12 +26,22 @@ import type {
 
 type SupabaseLike = Awaited<ReturnType<typeof createServerSupabaseClient>> | ReturnType<typeof createServiceRoleSupabaseClient>;
 
+type SupabaseContentFolderSummary = Pick<ContentFolderSummary, "id" | "name" | "slug" | "parent_id"> & {
+  path_names: string[] | null;
+};
+
 type SupabaseExpressionRow = Omit<ExpressionCard, "examples" | "day"> & {
   expression_examples?: ExpressionExample[] | null;
-  expression_days?: ExpressionDaySummary | null;
+  expression_days?:
+    | (Omit<ExpressionDaySummary, "folder_id" | "folder" | "folder_path"> & {
+        folder_id: string | null;
+        content_folders?: SupabaseContentFolderSummary | null;
+      })
+    | null;
 };
 
 type SupabaseExpressionDayRow = Omit<ExpressionDay, "expressions"> & {
+  content_folders?: SupabaseContentFolderSummary | null;
   expressions?: SupabaseExpressionRow[] | null;
 };
 
@@ -94,9 +105,20 @@ function normalizeGrammarNote(note: string | null | undefined) {
 
 function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
   const { expression_examples: examples, expression_days, ...expression } = row;
+  const dayFolder = expression_days
+    ? {
+        id: expression_days.id,
+        title: expression_days.title,
+        source_note: expression_days.source_note,
+        day_date: expression_days.day_date,
+        folder_id: expression_days.folder_id,
+        folder: expression_days.content_folders ?? null,
+        folder_path: expression_days.content_folders?.path_names ?? []
+      }
+    : undefined;
   return {
     ...expression,
-    day: expression_days ?? undefined,
+    day: dayFolder,
     examples: [...(examples ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   };
 }
@@ -105,6 +127,8 @@ function normalizeExpressionDay(row: SupabaseExpressionDayRow): ExpressionDay {
   const { expressions, ...day } = row;
   return {
     ...day,
+    folder: day.content_folders ?? null,
+    folder_path: day.content_folders?.path_names ?? [],
     expressions: [...(expressions ?? [])].map(normalizeExpression).sort((a, b) => a.source_order - b.source_order)
   };
 }
@@ -209,7 +233,9 @@ class SupabaseExpressionStore implements ExpressionStore {
     const supabase = await this.supabase();
     const { data, error } = await supabase
       .from("expression_days")
-      .select("*, expressions(*, expression_examples(*))")
+      .select(
+        "id,owner_id,title,raw_input,source_note,day_date,folder_id,created_by,created_at,updated_at,content_folders!expression_days_folder_id_fkey(id,name,slug,parent_id,path_names),expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))"
+      )
       .order("day_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -222,7 +248,9 @@ class SupabaseExpressionStore implements ExpressionStore {
     const supabase = await this.supabase();
     const { data, error } = await supabase
       .from("expression_days")
-      .select("*, expressions(*, expression_examples(*))")
+      .select(
+        "id,owner_id,title,raw_input,source_note,day_date,folder_id,created_by,created_at,updated_at,content_folders!expression_days_folder_id_fkey(id,name,slug,parent_id,path_names),expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))"
+      )
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
@@ -236,7 +264,9 @@ class SupabaseExpressionStore implements ExpressionStore {
     const supabase = await this.supabase();
     const { data, error } = await supabase
       .from("expressions")
-      .select("*, expression_examples(*), expression_days(id,title,source_note,day_date)")
+      .select(
+        "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,title,source_note,day_date,folder_id,content_folders(id,name,slug,parent_id,path_names))"
+      )
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
@@ -249,7 +279,9 @@ class SupabaseExpressionStore implements ExpressionStore {
     const supabase = await this.supabase();
     const { data, error } = await supabase
       .from("expressions")
-      .select("*, expression_examples(*), expression_days(id,title,source_note,day_date)")
+      .select(
+        "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,title,source_note,day_date,folder_id,content_folders(id,name,slug,parent_id,path_names))"
+      )
       .order("source_order", { ascending: true });
     if (error) throw error;
     return this.applyUserProgress((data ?? []).map((row: SupabaseExpressionRow) => normalizeExpression(row)));
@@ -275,7 +307,7 @@ class SupabaseExpressionStore implements ExpressionStore {
     if (limit <= 0) return [];
     const { data, error } = await (await this.supabase())
       .from("expression_days")
-      .select(`*, expressions(${EXPRESSION_CARD_COLUMNS})`)
+      .select(`id,owner_id,title,raw_input,source_note,day_date,folder_id,created_by,created_at,updated_at,content_folders!expression_days_folder_id_fkey(id,name,slug,parent_id,path_names),expressions(${EXPRESSION_CARD_COLUMNS})`)
       .order("day_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(limit);
