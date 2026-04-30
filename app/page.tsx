@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { getCurrentUser } from "@/lib/auth";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getExpressionStore } from "@/lib/lesson-store";
+import type { ExpressionDaySummary } from "@/lib/types";
 import type { UserIdentity } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +86,7 @@ async function DashboardSections({ user }: { user: UserIdentity }) {
           <div className="space-y-3">
             {recentDays.map((day) => (
               <Link key={day.id} href={`/expressions?topic=${day.id}`} className="block rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-card">
-                <p className="text-xs font-bold uppercase tracking-wide text-teal-700">{day.day_date ?? "날짜 없음"}</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-teal-700">{formatRecentDayLabel(day)}</p>
                 <h3 className="mt-2 text-xl font-black text-ink">{day.title}</h3>
                 <p className="mt-2 text-sm text-slate-600">표현 {day.expressions.length}개 · {day.source_note ?? "학습 노트"}</p>
               </Link>
@@ -95,6 +96,16 @@ async function DashboardSections({ user }: { user: UserIdentity }) {
       ) : null}
     </>
   );
+}
+
+type DashboardExpressionDaySummary = ExpressionDaySummary & {
+  folder_path?: string | null;
+};
+
+function formatRecentDayLabel(day: DashboardExpressionDaySummary) {
+  if (!day.folder_path) return day.day_date ?? "날짜 없음";
+  if (!day.day_date) return `폴더: ${day.folder_path}`;
+  return `${day.day_date} · ${day.folder_path}`;
 }
 
 function StatCard({ label, value }: { label: string; value: number }) {
