@@ -162,13 +162,6 @@ function normalizeExpressionDay(row: SupabaseExpressionDayRow): ExpressionDay {
   };
 }
 
-async function resolveDefaultWritableFolder(supabase: SupabaseLike) {
-  const { data, error } = await supabase.from("content_folders").select("id").eq("slug", "legacy-root").order("created_at", { ascending: true }).limit(1).maybeSingle();
-  if (error) throw error;
-  if (!data?.id) throw new Error("기본 표현 폴더를 찾을 수 없습니다.");
-  return data.id as string;
-}
-
 function normalizeIngestionRun(row: SupabaseIngestionRunRow): IngestionRun {
   return { ...row, normalized_payload: assertPayload(row.normalized_payload as ExpressionIngestionPayload) };
 }
