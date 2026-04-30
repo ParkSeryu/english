@@ -30,18 +30,14 @@ type SupabaseContentFolderSummary = Pick<ContentFolderSummary, "id" | "name" | "
   path_names: string[] | null;
 };
 
-type SupabaseExpressionRow = Omit<ExpressionCard, "examples" | "day"> & {
+type SupabaseExpressionRow = Omit<ExpressionCard, "due_at" | "interval_days" | "examples" | "day"> & {
   expression_examples?: ExpressionExample[] | null;
-  expression_days?:
-    | (Omit<ExpressionDaySummary, "folder_id" | "folder" | "folder_path"> & {
-        folder_id: string | null;
-        content_folders?: SupabaseContentFolderSummary | null;
-      })
-    | null;
+  expression_days?: unknown;
 };
 
-type SupabaseExpressionDayRow = Omit<ExpressionDay, "expressions"> & {
-  content_folders?: SupabaseContentFolderSummary | null;
+type SupabaseExpressionDayRow = Omit<ExpressionDay, "expressions" | "folder" | "folder_path"> & {
+  folder_id: string;
+  content_folders?: unknown;
   expressions?: SupabaseExpressionRow[] | null;
 };
 
@@ -103,21 +99,54 @@ function normalizeGrammarNote(note: string | null | undefined) {
   return compactNote;
 }
 
+function normalizeFolder(summary: unknown): ContentFolderSummary | null {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) return null;
+
+  const candidate = summary as Partial<SupabaseContentFolderSummary>;
+  if (typeof candidate.id !== "string" || !candidate.id) return null;
+  const pathNames = Array.isArray(candidate.path_names)
+    ? candidate.path_names.filter((name): name is string => typeof name === "string")
+    : [];
+
+  return {
+    id: candidate.id,
+    name: String(candidate.name ?? ""),
+    slug: String(candidate.slug ?? ""),
+    parent_id: typeof candidate.parent_id === "string" ? candidate.parent_id : null,
+    path_names: pathNames
+  };
+}
+
+function legacyRootFolderId(folder: { folder_id?: string | null } | null | undefined): string | null {
+  return folder?.folder_id ?? null;
+}
+
 function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
   const { expression_examples: examples, expression_days, ...expression } = row;
-  const dayFolder = expression_days
+  const relation = expression_days as
+    | (Omit<ExpressionDaySummary, "folder_id" | "folder" | "folder_path"> & {
+        folder_id: string | null;
+        content_folders?: SupabaseContentFolderSummary | null;
+      })
+    | null;
+
+  const normalizedFolder = normalizeFolder(relation?.content_folders);
+  const dayFolder = relation
     ? {
-        id: expression_days.id,
-        title: expression_days.title,
-        source_note: expression_days.source_note,
-        day_date: expression_days.day_date,
-        folder_id: expression_days.folder_id,
-        folder: expression_days.content_folders ?? null,
-        folder_path: expression_days.content_folders?.path_names ?? []
+        id: relation.id,
+        title: relation.title,
+        source_note: relation.source_note,
+        day_date: relation.day_date,
+        folder_id: relation.folder_id ?? null,
+        folder: normalizedFolder,
+        folder_path: normalizedFolder?.path_names ?? []
       }
     : undefined;
+
   return {
     ...expression,
+    due_at: null,
+    interval_days: 0,
     day: dayFolder,
     examples: [...(examples ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   };
@@ -125,12 +154,20 @@ function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
 
 function normalizeExpressionDay(row: SupabaseExpressionDayRow): ExpressionDay {
   const { expressions, ...day } = row;
+  const normalizedFolder = normalizeFolder(day.content_folders);
   return {
     ...day,
-    folder: day.content_folders ?? null,
-    folder_path: day.content_folders?.path_names ?? [],
+    folder: normalizedFolder,
+    folder_path: normalizedFolder?.path_names ?? [],
     expressions: [...(expressions ?? [])].map(normalizeExpression).sort((a, b) => a.source_order - b.source_order)
   };
+}
+
+async function resolveDefaultWritableFolder(supabase: SupabaseLike) {
+  const { data, error } = await supabase.from("content_folders").select("id").eq("slug", "legacy-root").order("created_at", { ascending: true }).limit(1).maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("기본 표현 폴더를 찾을 수 없습니다.");
+  return data.id as string;
 }
 
 function normalizeIngestionRun(row: SupabaseIngestionRunRow): IngestionRun {
