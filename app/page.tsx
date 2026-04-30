@@ -99,13 +99,14 @@ async function DashboardSections({ user }: { user: UserIdentity }) {
 }
 
 type DashboardExpressionDaySummary = ExpressionDaySummary & {
-  folder_path?: string | null;
+  folder_path?: string | string[] | null;
 };
 
 function formatRecentDayLabel(day: DashboardExpressionDaySummary) {
   if (!day.folder_path) return day.day_date ?? "날짜 없음";
-  if (!day.day_date) return `폴더: ${day.folder_path}`;
-  return `${day.day_date} · ${day.folder_path}`;
+  const folderPath = Array.isArray(day.folder_path) ? day.folder_path.join(" / ") : day.folder_path;
+  if (!day.day_date) return `폴더: ${folderPath}`;
+  return `${day.day_date} · ${folderPath}`;
 }
 
 function StatCard({ label, value }: { label: string; value: number }) {
