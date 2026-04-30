@@ -3,21 +3,30 @@ import type { ExpressionCard } from "@/lib/types";
 type MemorizationCandidate = Pick<ExpressionCard, "id" | "unknown_count" | "known_count" | "last_reviewed_at" | "last_result" | "source_order" | "due_at" | "interval_days"> &
   Partial<Pick<ExpressionCard, "created_at">>;
 
+type ReviewSchedulingState = Pick<MemorizationCandidate, "interval_days" | "last_result" | "last_reviewed_at">;
+
 const DEFAULT_LIMIT = 300;
-const MAX_INTERVAL_DAYS = 30;
 const KOREA_TIME_OFFSET_MS = 9 * 60 * 60 * 1000;
+const KNOWN_INTERVAL_DAYS = [1, 3, 7, 14, 30] as const;
 
 function koreanDateKey(date: Date) {
   return new Date(date.getTime() + KOREA_TIME_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-function nextKoreanMidnight(now: Date) {
+function koreanMidnightAfterDays(now: Date, intervalDays: number) {
   const koreaNow = new Date(now.getTime() + KOREA_TIME_OFFSET_MS);
-  return new Date(Date.UTC(koreaNow.getUTCFullYear(), koreaNow.getUTCMonth(), koreaNow.getUTCDate() + 1) - KOREA_TIME_OFFSET_MS);
+  const daysUntilDue = Math.max(1, intervalDays);
+  return new Date(Date.UTC(koreaNow.getUTCFullYear(), koreaNow.getUTCMonth(), koreaNow.getUTCDate() + daysUntilDue) - KOREA_TIME_OFFSET_MS);
 }
 
 function isSameKoreanDay(a: Date, b: Date) {
   return koreanDateKey(a) === koreanDateKey(b);
+}
+
+function reviewedOnSameKoreanDay(reviewedAt: string | null | undefined, now: Date) {
+  if (!reviewedAt) return false;
+  const reviewed = new Date(reviewedAt);
+  return Number.isFinite(reviewed.getTime()) && isSameKoreanDay(reviewed, now);
 }
 
 function timeRank(value: string | null | undefined, fallback: number) {
@@ -44,9 +53,7 @@ export function isExpressionDue(card: MemorizationCandidate, now = new Date()) {
   const lastReviewed = new Date(card.last_reviewed_at);
   if (!Number.isFinite(lastReviewed.getTime())) return true;
 
-  if (card.last_result === "known") return !isSameKoreanDay(lastReviewed, now);
-
-  if (!card.due_at) return true;
+  if (!card.due_at) return card.last_result === "known" ? !isSameKoreanDay(lastReviewed, now) : true;
 
   const dueAt = Date.parse(card.due_at);
   if (!Number.isFinite(dueAt)) return true;
@@ -54,10 +61,13 @@ export function isExpressionDue(card: MemorizationCandidate, now = new Date()) {
 }
 
 export function nextKnownIntervalDays(currentIntervalDays: number) {
-  if (currentIntervalDays <= 0) return 1;
-  if (currentIntervalDays < 3) return 3;
-  if (currentIntervalDays < 7) return 7;
-  return Math.min(currentIntervalDays * 2, MAX_INTERVAL_DAYS);
+  if (currentIntervalDays <= 0) return 3;
+  return KNOWN_INTERVAL_DAYS.find((intervalDays) => intervalDays > currentIntervalDays) ?? KNOWN_INTERVAL_DAYS[KNOWN_INTERVAL_DAYS.length - 1];
+}
+
+export function lapsedIntervalDays(currentIntervalDays: number) {
+  if (currentIntervalDays <= 0) return 0;
+  return [...KNOWN_INTERVAL_DAYS].reverse().find((intervalDays) => intervalDays < currentIntervalDays) ?? KNOWN_INTERVAL_DAYS[0];
 }
 
 export function nextDueAtForUnknown() {
@@ -65,8 +75,19 @@ export function nextDueAtForUnknown() {
   return null;
 }
 
-export function nextDueAtForKnown(_intervalDays: number, now = new Date()) {
-  return nextKoreanMidnight(now).toISOString();
+export function nextDueAtForKnown(intervalDays: number, now = new Date()) {
+  return koreanMidnightAfterDays(now, intervalDays).toISOString();
+}
+
+export function nextExpressionReviewSchedule(current: ReviewSchedulingState, result: "known" | "unknown", now = new Date()) {
+  if (result === "unknown") {
+    const alreadyFailedToday = current.last_result === "unknown" && reviewedOnSameKoreanDay(current.last_reviewed_at, now);
+    const intervalDays = alreadyFailedToday ? current.interval_days : lapsedIntervalDays(current.interval_days);
+    return { intervalDays, dueAt: nextDueAtForUnknown() };
+  }
+
+  const intervalDays = current.last_result === "unknown" ? Math.max(current.interval_days, KNOWN_INTERVAL_DAYS[0]) : nextKnownIntervalDays(current.interval_days);
+  return { intervalDays, dueAt: nextDueAtForKnown(intervalDays, now) };
 }
 
 export function compareExpressionsForMemorization<T extends MemorizationCandidate>(a: T, b: T) {
