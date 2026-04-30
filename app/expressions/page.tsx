@@ -5,11 +5,11 @@ import { TopicFilterSelect } from "@/components/TopicFilterSelect";
 import { requireCurrentUser } from "@/lib/auth";
 import { getExpressionStore } from "@/lib/lesson-store";
 import { sortExpressionsByPriority } from "@/lib/expression-priority";
-import type { ExpressionDaySummary } from "@/lib/types";
+import type { ExpressionDay } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type ExpressionDayListItem = ExpressionDaySummary & {
+type ExpressionDayListItem = ExpressionDay & {
   folder_path?: string | null;
   folderPath?: string | null;
   folder?: {
