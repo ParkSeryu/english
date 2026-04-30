@@ -117,10 +117,6 @@ function normalizeFolder(summary: unknown): ContentFolderSummary | null {
   };
 }
 
-function legacyRootFolderId(folder: { folder_id?: string | null } | null | undefined): string | null {
-  return folder?.folder_id ?? null;
-}
-
 function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
   const { expression_examples: examples, expression_days, ...expression } = row;
   const relation = expression_days as
@@ -161,13 +157,6 @@ function normalizeExpressionDay(row: SupabaseExpressionDayRow): ExpressionDay {
     folder_path: normalizedFolder?.path_names ?? [],
     expressions: [...(expressions ?? [])].map(normalizeExpression).sort((a, b) => a.source_order - b.source_order)
   };
-}
-
-async function resolveDefaultWritableFolder(supabase: SupabaseLike) {
-  const { data, error } = await supabase.from("content_folders").select("id").eq("slug", "legacy-root").order("created_at", { ascending: true }).limit(1).maybeSingle();
-  if (error) throw error;
-  if (!data?.id) throw new Error("기본 표현 폴더를 찾을 수 없습니다.");
-  return data.id as string;
 }
 
 function normalizeIngestionRun(row: SupabaseIngestionRunRow): IngestionRun {
