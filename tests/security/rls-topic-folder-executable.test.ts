@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { describe, expect, it } from "vitest";
 
 const isEnabled = process.env.VERIFY_EXECUTABLE_RLS === "1";
 const scriptPath = path.resolve(process.cwd(), "scripts/verify-topic-folder-access-rls.sh");

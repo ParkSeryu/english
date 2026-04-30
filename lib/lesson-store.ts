@@ -117,10 +117,6 @@ function normalizeFolder(summary: unknown): ContentFolderSummary | null {
   };
 }
 
-function legacyRootFolderId(folder: { folder_id?: string | null } | null | undefined): string | null {
-  return folder?.folder_id ?? null;
-}
-
 function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
   const { expression_examples: examples, expression_days, ...expression } = row;
   const relation = expression_days as
@@ -509,6 +505,7 @@ class SupabaseExpressionStore implements ExpressionStore {
     let createdDayId: string | null = null;
     try {
       const requestedDayDate = run.normalized_payload.expression_day.day_date ?? null;
+      const defaultFolderId = await resolveDefaultWritableFolder(supabase);
       if (requestedDayDate) {
         const { data: existingDay, error: existingDayError } = await supabase
           .from("expression_days")
@@ -531,6 +528,7 @@ class SupabaseExpressionStore implements ExpressionStore {
             raw_input: run.normalized_payload.expression_day.raw_input,
             source_note: run.normalized_payload.expression_day.source_note ?? null,
             day_date: requestedDayDate,
+            folder_id: defaultFolderId,
             created_by: "llm",
             updated_at: timestamp
           })
