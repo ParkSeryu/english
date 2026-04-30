@@ -30,14 +30,21 @@ type SupabaseContentFolderSummary = Pick<ContentFolderSummary, "id" | "name" | "
   path_names: string[] | null;
 };
 
+type SupabaseExpressionDaySummary = Omit<ExpressionDaySummary, "folder_id" | "folder" | "folder_path"> & {
+  folder_id: string | null;
+  content_folders?: SupabaseContentFolderSummary | SupabaseContentFolderSummary[] | null;
+};
+
 type SupabaseExpressionRow = Omit<ExpressionCard, "due_at" | "interval_days" | "examples" | "day"> & {
+  due_at?: string | null;
+  interval_days?: number;
   expression_examples?: ExpressionExample[] | null;
-  expression_days?: unknown;
+  expression_days?: SupabaseExpressionDaySummary | SupabaseExpressionDaySummary[] | null;
 };
 
 type SupabaseExpressionDayRow = Omit<ExpressionDay, "expressions" | "folder" | "folder_path"> & {
-  folder_id: string;
-  content_folders?: unknown;
+  folder_id: string | null;
+  content_folders?: SupabaseContentFolderSummary | SupabaseContentFolderSummary[] | null;
   expressions?: SupabaseExpressionRow[] | null;
 };
 
@@ -100,7 +107,8 @@ function normalizeGrammarNote(note: string | null | undefined) {
 }
 
 function normalizeFolder(summary: unknown): ContentFolderSummary | null {
-  if (!summary || typeof summary !== "object" || Array.isArray(summary)) return null;
+  if (!summary || typeof summary !== "object") return null;
+  if (Array.isArray(summary)) return normalizeFolder(summary[0]);
 
   const candidate = summary as Partial<SupabaseContentFolderSummary>;
   if (typeof candidate.id !== "string" || !candidate.id) return null;
@@ -117,19 +125,10 @@ function normalizeFolder(summary: unknown): ContentFolderSummary | null {
   };
 }
 
-function legacyRootFolderId(folder: { folder_id?: string | null } | null | undefined): string | null {
-  return folder?.folder_id ?? null;
-}
-
 function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
-  const { expression_examples: examples, expression_days, ...expression } = row;
-  const relation = expression_days as
-    | (Omit<ExpressionDaySummary, "folder_id" | "folder" | "folder_path"> & {
-        folder_id: string | null;
-        content_folders?: SupabaseContentFolderSummary | null;
-      })
-    | null;
-
+  const { expression_examples: examples, due_at, interval_days, expression_days, ...expression } = row;
+  const relationBase = Array.isArray(expression_days) ? expression_days[0] : expression_days;
+  const relation = relationBase ?? null;
   const normalizedFolder = normalizeFolder(relation?.content_folders);
   const dayFolder = relation
     ? {
@@ -145,8 +144,8 @@ function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
 
   return {
     ...expression,
-    due_at: null,
-    interval_days: 0,
+    due_at: due_at ?? null,
+    interval_days: interval_days ?? 0,
     day: dayFolder,
     examples: [...(examples ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   };
@@ -532,6 +531,7 @@ class SupabaseExpressionStore implements ExpressionStore {
             source_note: run.normalized_payload.expression_day.source_note ?? null,
             day_date: requestedDayDate,
             created_by: "llm",
+            folder_id: await resolveDefaultWritableFolder(supabase),
             updated_at: timestamp
           })
           .select("*")
