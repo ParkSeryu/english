@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { AppNav } from "@/components/AppNav";
+import { MobileZoomGuard } from "@/components/MobileZoomGuard";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { getCurrentUser } from "@/lib/auth";
@@ -63,6 +64,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   themeColor: "#0f766e"
 };
 
@@ -76,6 +79,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="ko">
       <body className={inter.className}>
         <ServiceWorkerRegistration />
+        <MobileZoomGuard />
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>
