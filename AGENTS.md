@@ -2,6 +2,17 @@
 
 This repo follows the workspace-level OMX/autonomous-agent instructions. The following project-local gate is mandatory and exists because this app has repeatedly appeared "done" while the running Next dev server or live route was still broken.
 
+## GPT/Codex mistake-reduction harness
+
+- Keep autonomous execution as the default for clear, low-risk, reversible work; do not stop to ask permission when the next step is obvious.
+- Before changing code, state only the assumptions that materially affect scope, behavior, or risk. If an assumption could cause the wrong change, ask one concise clarifying question instead of guessing.
+- Prefer the simplest change that satisfies the request. Do not add abstractions, configurability, dependencies, or defensive handling unless the task directly requires them.
+- Make surgical edits only. Every changed line should trace to the latest user request or to cleanup made necessary by that change.
+- If you notice adjacent issues, mention them separately instead of fixing them silently.
+- Convert vague requests into verifiable goals before editing: identify the affected surface, expected behavior, and the smallest check that proves completion.
+- For bug fixes, prefer a failing or targeted test that reproduces the issue before the fix when practical; for refactors, preserve behavior and verify before and after when coverage exists.
+- If a change starts becoming larger than expected, pause and report the tradeoff rather than broadening scope silently.
+
 ## Scope discipline — do only what was asked
 
 - Do not broaden a user request into adjacent UI, copy, behavior, schema, or test changes unless the user explicitly asks for that broader change.
