@@ -88,7 +88,9 @@ describe("MemorizeCard", () => {
     expect(screen.getByText(expression.english)).toBeInTheDocument();
     expect(screen.getByText("비슷한 표현")).toBeInTheDocument();
     expect(screen.getByText("They don't seem interested in me.")).toBeInTheDocument();
-    expect(screen.getByText(expression.grammar_note ?? "")).toBeInTheDocument();
+    expect(screen.getByText("don't seem to + 동사원형")).toBeInTheDocument();
+    expect(screen.getByText("~하는 것 같지 않다")).toBeInTheDocument();
+    expect(screen.getByLabelText("뜻")).toHaveTextContent("→");
     expect(screen.queryByText("느낌 / 뉘앙스")).not.toBeInTheDocument();
     expect(screen.queryByText("구조")).not.toBeInTheDocument();
     expect(screen.queryByText(expression.nuance_note ?? "")).not.toBeInTheDocument();
@@ -114,10 +116,10 @@ describe("MemorizeCard", () => {
     expect(screen.getByRole("button", { name: /정답 보기/ })).toBeInTheDocument();
   });
 
-  it("preserves leading star text while highlighting grammar and pattern labels", async () => {
+  it("preserves leading star text while formatting labeled and unlabeled meaning separators", async () => {
     const user = userEvent.setup();
     const { MemorizeCard } = await importModule<MemorizeCardModule>("@/components/MemorizeCard");
-    const grammarNote = "★★★ 문법: be used to + 명사/-ing = ~에 익숙하다\n  ★★★ 패턴: used to + 동사원형 = 예전에 ~하곤 했다";
+    const grammarNote = "★★★ 문법: be used to + 명사/-ing = ~에 익숙하다\nused to + 동사원형 = 예전에 ~하곤 했다";
 
     render(<MemorizeCard expression={{ ...expression, grammar_note: grammarNote }} />);
 
@@ -126,9 +128,11 @@ describe("MemorizeCard", () => {
     const noteSection = screen.getByRole("heading", { name: "문법/패턴" }).closest("section");
     expect(noteSection).not.toBeNull();
 
-    const labels = within(noteSection as HTMLElement).getAllByText(/^(문법:|패턴:)$/);
-    expect(labels).toHaveLength(2);
+    const labels = within(noteSection as HTMLElement).getAllByText(/^문법$/);
+    expect(labels).toHaveLength(1);
     expect(labels.every((label) => label.tagName.toLowerCase() === "strong")).toBe(true);
+    expect(noteSection).not.toHaveTextContent("문법:");
+    expect(noteSection).not.toHaveTextContent("패턴:");
     expect(within(noteSection as HTMLElement).queryByText("✦")).not.toBeInTheDocument();
     expect(noteSection).toHaveTextContent("★★★");
     expect(noteSection).toHaveTextContent("be used to + 명사/-ing");
