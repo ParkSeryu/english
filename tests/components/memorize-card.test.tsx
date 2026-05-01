@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/actions", () => ({
-  recordExpressionReviewAction: vi.fn(async () => undefined)
+  recordExpressionReviewAction: vi.fn(async () => undefined),
+  recordExpressionReviewInPlaceAction: vi.fn(async () => ({ ok: true }))
 }));
 
 async function importModule<T>(specifier: string): Promise<T> {
@@ -75,16 +76,16 @@ describe("MemorizeCard", () => {
     const { MemorizeCard } = await importModule<MemorizeCardModule>("@/components/MemorizeCard");
     render(<MemorizeCard expression={expression} />);
 
-    expect(screen.getByText(expression.korean_prompt)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: expression.korean_prompt })).toBeInTheDocument();
 
     const counters = screen.getByText("외움 1회").parentElement;
     expect(counters).not.toBeNull();
     expect(within(counters as HTMLElement).getAllByText(/회$/).map((node) => node.textContent)).toEqual(["외움 1회", "틀림 2회"]);
     expect(screen.queryByText(expression.english)).not.toBeInTheDocument();
-    expect(screen.queryByText(expression.grammar_note ?? "")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
 
+    expect(screen.queryByRole("button", { name: /정답 보기/ })).not.toBeInTheDocument();
     expect(screen.getByText(expression.english)).toBeInTheDocument();
     expect(screen.getByText("비슷한 표현")).toBeInTheDocument();
     expect(screen.getByText("They don't seem interested in me.")).toBeInTheDocument();

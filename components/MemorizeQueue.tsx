@@ -25,10 +25,6 @@ type StoredQueueState = {
   deferredIds?: unknown;
 };
 
-function deferHref(ids: string[]) {
-  return ids.length > 0 ? `/memorize?defer=${encodeURIComponent(ids.join(","))}` : "/memorize";
-}
-
 function appendDeferredId(ids: string[], id: string) {
   return [...removeDeferredId(ids, id), id];
 }
@@ -44,14 +40,6 @@ function normalizeDeferredIds(ids: string[], expressions: ExpressionCard[]) {
 
 function queueSignature(expressions: ExpressionCard[], deferredIds: string[]) {
   return `${expressions.map((expression) => expression.id).join("\u0000")}::${deferredIds.join("\u0000")}`;
-}
-
-function reviewReturnTargets(activeId: string, deferredIds: string[]) {
-  const withoutActive = removeDeferredId(deferredIds, activeId);
-  return {
-    knownReturnTo: deferHref(withoutActive),
-    unknownReturnTo: deferHref([...withoutActive, activeId])
-  };
 }
 
 function orderedExpressions(expressions: ExpressionCard[], queueIds: string[]) {
@@ -161,7 +149,6 @@ export function MemorizeQueue({ expressions, deferredIds, storageKey = DEFAULT_S
   const propsSignature = useMemo(() => queueSignature(expressions, initialDeferredIds), [expressions, initialDeferredIds]);
   const fallbackState = useMemo(() => defaultQueueState(propsSignature, expressions, initialDeferredIds), [propsSignature, expressions, initialDeferredIds]);
   const [sessionState, setSessionState] = useState<QueueState>(fallbackState);
-  const [storageReady, setStorageReady] = useState(false);
   const activeState = sessionState.signature === propsSignature ? sessionState : fallbackState;
   const queue = withOptimisticUnknownCounts(orderedExpressions(expressions, activeState.queueIds), activeState.optimisticUnknownCounts);
   const remainingCount = activeState.queueIds.length;
@@ -169,13 +156,12 @@ export function MemorizeQueue({ expressions, deferredIds, storageKey = DEFAULT_S
 
   useEffect(() => {
     setSessionState(reconcileQueueState(propsSignature, expressions, initialDeferredIds, readStoredQueueState(storageKey)));
-    setStorageReady(true);
   }, [expressions, initialDeferredIds, propsSignature, storageKey]);
 
   useEffect(() => {
-    if (!storageReady || sessionState.signature !== propsSignature) return;
+    if (sessionState.signature !== propsSignature) return;
     writeStoredQueueState(storageKey, sessionState);
-  }, [propsSignature, sessionState, storageKey, storageReady]);
+  }, [propsSignature, sessionState, storageKey]);
 
   if (!activeExpression) {
     return (
@@ -185,8 +171,6 @@ export function MemorizeQueue({ expressions, deferredIds, storageKey = DEFAULT_S
       </div>
     );
   }
-
-  const { knownReturnTo, unknownReturnTo } = reviewReturnTargets(activeExpression.id, activeState.deferredIds);
 
   function handleReviewSubmit(result: "known" | "unknown") {
     setSessionState((current) => {
@@ -214,8 +198,6 @@ export function MemorizeQueue({ expressions, deferredIds, storageKey = DEFAULT_S
       <MemorizeCard
         key={activeExpression.id}
         expression={activeExpression}
-        knownReturnTo={knownReturnTo}
-        unknownReturnTo={unknownReturnTo}
         onReviewSubmit={handleReviewSubmit}
       />
     </div>

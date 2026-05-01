@@ -8,6 +8,14 @@ export function ServiceWorkerRegistration() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
+    if (process.env.NODE_ENV !== "production") {
+      void navigator.serviceWorker.getRegistrations().then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())));
+      if ("caches" in window) {
+        void caches.keys().then((cacheNames) => Promise.all(cacheNames.filter((cacheName) => cacheName.startsWith("english-review-")).map((cacheName) => caches.delete(cacheName))));
+      }
+      return;
+    }
+
     const { hostname, protocol } = window.location;
     const canUseServiceWorker = protocol === "https:" || isLocalhost(hostname);
     if (!canUseServiceWorker) return;

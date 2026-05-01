@@ -37,13 +37,22 @@ export async function updateExpressionMemoAction(expressionId: string, _previous
   }
 }
 
-export async function recordExpressionReviewAction(expressionId: string, result: "known" | "unknown", returnTo = "/memorize") {
+async function recordExpressionReview(expressionId: string, result: "known" | "unknown") {
   if (result !== "known" && result !== "unknown") throw new Error("암기 결과가 올바르지 않습니다.");
   const user = await requireCurrentUser();
   await getExpressionStore(user).recordReviewResult(expressionId, result);
   revalidateAppPaths();
   revalidatePath(`/expressions/${expressionId}`);
+}
+
+export async function recordExpressionReviewAction(expressionId: string, result: "known" | "unknown", returnTo = "/memorize") {
+  await recordExpressionReview(expressionId, result);
   redirect(returnTo.startsWith("/") ? returnTo : "/memorize");
+}
+
+export async function recordExpressionReviewInPlaceAction(expressionId: string, result: "known" | "unknown") {
+  await recordExpressionReview(expressionId, result);
+  return { ok: true };
 }
 
 export async function createQuestionNoteAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {

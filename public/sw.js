@@ -1,4 +1,4 @@
-const CACHE_VERSION = "english-review-v1";
+const CACHE_VERSION = "english-review-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE_ASSETS = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png"];
@@ -29,7 +29,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  const isStaticAsset = url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname === "/favicon.ico";
+  const isStaticAsset = url.pathname.startsWith("/icons/") || url.pathname === "/favicon.ico";
   if (!isStaticAsset) return;
 
   event.respondWith(

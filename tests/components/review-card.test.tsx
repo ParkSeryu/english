@@ -1,11 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ExpressionCard } from "@/lib/types";
 
-vi.mock("@/app/actions", () => ({ recordExpressionReviewAction: vi.fn(async () => undefined) }));
+vi.mock("@/app/actions", () => ({
+  recordExpressionReviewAction: vi.fn(async () => undefined),
+  recordExpressionReviewInPlaceAction: vi.fn(async () => ({ ok: true }))
+}));
 
+import { recordExpressionReviewAction, recordExpressionReviewInPlaceAction } from "@/app/actions";
 import { MemorizeCard } from "@/components/MemorizeCard";
 
 const expression: ExpressionCard = {
@@ -32,17 +36,37 @@ const expression: ExpressionCard = {
 };
 
 describe("MemorizeCard", () => {
+  const redirectReviewAction = vi.mocked(recordExpressionReviewAction);
+  const inPlaceReviewAction = vi.mocked(recordExpressionReviewInPlaceAction);
+
+  beforeEach(() => {
+    redirectReviewAction.mockClear();
+    inPlaceReviewAction.mockClear();
+  });
+
   it("hides English before reveal and then shows known/unknown controls", async () => {
     const user = userEvent.setup();
     render(<MemorizeCard expression={expression} />);
 
-    expect(screen.getByText((content) => content.includes(expression.korean_prompt))).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: expression.korean_prompt })).toBeInTheDocument();
     expect(screen.queryByText(expression.english)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
 
+    expect(screen.queryByRole("button", { name: /정답 보기/ })).not.toBeInTheDocument();
     expect(screen.getByText(expression.english)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /외웠음/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /모름/ })).toBeInTheDocument();
+  });
+
+  it("uses the redirecting review action when it is not inside an optimistic queue", async () => {
+    const user = userEvent.setup();
+    render(<MemorizeCard expression={expression} returnTo="/review/confusing" />);
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+
+    await waitFor(() => expect(redirectReviewAction).toHaveBeenCalledWith(expression.id, "unknown", "/review/confusing"));
+    expect(inPlaceReviewAction).not.toHaveBeenCalled();
   });
 });

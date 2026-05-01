@@ -20,14 +20,15 @@ test("mobile user can memorize an LLM-approved expression and mark unknown", asy
   await expect(page.getByText("I am used to ~")).toBeVisible();
 
   await page.getByRole("link", { name: /^암기$/ }).click();
-  await expect(page.getByText("~해야 한다 / ~할 필요가 있다")).toBeVisible();
-  await expect(page.getByText("have to ~")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "~해야 한다 / ~할 필요가 있다" })).toBeVisible();
+  await expect(page.getByText("have to ~")).toBeHidden();
 
   await page.getByRole("button", { name: /정답 보기/ }).click();
   await expect(page.getByText("have to ~")).toBeVisible();
   await page.getByRole("button", { name: /모름/ }).click();
-  await expect(page.getByText("~에 익숙하다")).toBeVisible();
-  await expect(page.getByText("I am used to ~")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/memorize$/);
+  await expect(page.getByRole("heading", { name: "~에 익숙하다 / ~에 익숙해졌다" })).toBeVisible();
+  await expect(page.getByText("I am used to ~")).toBeHidden();
 });
 
 test("mobile user can add a question note", async ({ page }) => {

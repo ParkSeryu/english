@@ -1,15 +1,38 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useState, useTransition } from "react";
 
-import { recordExpressionReviewAction } from "@/app/actions";
+import { recordExpressionReviewAction, recordExpressionReviewInPlaceAction } from "@/app/actions";
 import type { ExpressionCard } from "@/lib/types";
 
-export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ?? "/memorize", unknownReturnTo = returnTo ?? "/memorize", onReviewSubmit }: { expression: ExpressionCard; returnTo?: string; knownReturnTo?: string; unknownReturnTo?: string; onReviewSubmit?: (result: "known" | "unknown") => void }) {
+type MemorizeCardProps = {
+  expression: ExpressionCard;
+  returnTo?: string;
+  onReviewSubmit?: (result: "known" | "unknown") => void;
+};
+
+export function MemorizeCard({ expression, returnTo = "/memorize", onReviewSubmit }: MemorizeCardProps) {
   const [revealed, setRevealed] = useState(false);
-  const knownAction = useMemo(() => recordExpressionReviewAction.bind(null, expression.id, "known", knownReturnTo), [expression.id, knownReturnTo]);
-  const unknownAction = useMemo(() => recordExpressionReviewAction.bind(null, expression.id, "unknown", unknownReturnTo), [expression.id, unknownReturnTo]);
+  const [, startTransition] = useTransition();
+
+  function handleReview(result: "known" | "unknown") {
+    if (result === "unknown") setRevealed(false);
+
+    if (onReviewSubmit) {
+      onReviewSubmit(result);
+      startTransition(() => {
+        void recordExpressionReviewInPlaceAction(expression.id, result).catch((error: unknown) => {
+          console.error("Failed to record expression review", error);
+        });
+      });
+      return;
+    }
+
+    startTransition(() => {
+      void recordExpressionReviewAction(expression.id, result, returnTo);
+    });
+  }
 
   return (
     <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-card">
@@ -19,11 +42,11 @@ export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ??
       </div>
 
       {!revealed ? (
-        <button type="button" onClick={() => setRevealed(true)} className="mt-6 block w-full rounded-3xl bg-ink p-5 text-left text-white shadow-lg shadow-slate-200 transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-teal-200" aria-expanded="false">
+        <div className="mt-6 rounded-3xl bg-ink p-5 text-white shadow-lg shadow-slate-200">
           <p className="text-sm font-black text-teal-200">한국어를 보고 영어로 말하기</p>
           <h1 className="mt-3 whitespace-pre-wrap text-2xl font-black leading-tight">{expression.korean_prompt}</h1>
-          <span className="mt-5 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-teal-600 px-5 py-3 text-center text-base font-black text-white">정답 보기</span>
-        </button>
+          <button type="button" onClick={() => setRevealed(true)} className="mt-5 min-h-14 w-full rounded-full bg-teal-600 px-5 py-3 text-center text-base font-black text-white transition hover:bg-teal-500 focus:outline-none focus:ring-4 focus:ring-teal-200" aria-expanded="false">정답 보기</button>
+        </div>
       ) : (
         <>
           <div className="mt-6 rounded-[1.75rem] bg-gradient-to-br from-ink to-slate-800 p-5 text-white shadow-lg shadow-slate-200">
@@ -48,8 +71,8 @@ export function MemorizeCard({ expression, returnTo, knownReturnTo = returnTo ??
               </section>
             ) : null}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <form action={unknownAction} onSubmit={() => { setRevealed(false); onReviewSubmit?.("unknown"); }}><button type="submit" className="min-h-14 w-full rounded-full border border-rose-200 bg-rose-50 px-5 py-3 font-black text-rose-700 transition hover:bg-rose-100">모름</button></form>
-              <form action={knownAction} onSubmit={() => onReviewSubmit?.("known")}><button type="submit" className="min-h-14 w-full rounded-full bg-emerald-600 px-5 py-3 font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700">외웠음</button></form>
+              <button type="button" onClick={() => handleReview("unknown")} className="min-h-14 w-full rounded-full border border-rose-200 bg-rose-50 px-5 py-3 font-black text-rose-700 transition hover:bg-rose-100">모름</button>
+              <button type="button" onClick={() => handleReview("known")} className="min-h-14 w-full rounded-full bg-emerald-600 px-5 py-3 font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700">외웠음</button>
             </div>
           </div>
         </>

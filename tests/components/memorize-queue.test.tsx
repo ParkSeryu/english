@@ -5,9 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ExpressionCard } from "@/lib/types";
 
-vi.mock("@/app/actions", () => ({ recordExpressionReviewAction: vi.fn(async () => undefined) }));
+vi.mock("@/app/actions", () => ({
+  recordExpressionReviewAction: vi.fn(async () => undefined),
+  recordExpressionReviewInPlaceAction: vi.fn(async () => ({ ok: true }))
+}));
 
-import { recordExpressionReviewAction } from "@/app/actions";
+import { recordExpressionReviewAction, recordExpressionReviewInPlaceAction } from "@/app/actions";
 import { MemorizeQueue } from "@/components/MemorizeQueue";
 
 function expression(overrides: Partial<ExpressionCard>): ExpressionCard {
@@ -40,11 +43,21 @@ const first = expression({ id: "expression-1", korean_prompt: "첫 번째 한국
 const second = expression({ id: "expression-2", korean_prompt: "두 번째 한국어", english: "Second answer", source_order: 1 });
 const third = expression({ id: "expression-3", korean_prompt: "세 번째 한국어", english: "Third answer", source_order: 2 });
 
+function expectPromptVisible(prompt: string) {
+  expect(screen.getByRole("heading", { name: prompt })).toBeInTheDocument();
+}
+
+function expectPromptAbsent(prompt: string) {
+  expect(screen.queryByRole("heading", { name: prompt })).not.toBeInTheDocument();
+}
+
 describe("MemorizeQueue", () => {
-  const reviewAction = vi.mocked(recordExpressionReviewAction);
+  const redirectReviewAction = vi.mocked(recordExpressionReviewAction);
+  const inPlaceReviewAction = vi.mocked(recordExpressionReviewInPlaceAction);
 
   beforeEach(() => {
-    reviewAction.mockClear();
+    redirectReviewAction.mockClear();
+    inPlaceReviewAction.mockClear();
     window.sessionStorage.clear();
   });
 
@@ -52,14 +65,16 @@ describe("MemorizeQueue", () => {
     const user = userEvent.setup();
     render(<MemorizeQueue expressions={[first, second]} />);
 
-    expect(screen.getByText("첫 번째 한국어")).toBeInTheDocument();
+    expectPromptVisible("첫 번째 한국어");
 
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
     await user.click(screen.getByRole("button", { name: /모름/ }));
 
     expect(screen.queryByText("First answer")).not.toBeInTheDocument();
-    expect(screen.queryByText("첫 번째 한국어")).not.toBeInTheDocument();
-    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+    expectPromptAbsent("첫 번째 한국어");
+    expectPromptVisible("두 번째 한국어");
+    await waitFor(() => expect(inPlaceReviewAction).toHaveBeenCalledWith(first.id, "unknown"));
+    expect(redirectReviewAction).not.toHaveBeenCalled();
   });
 
   it("keeps locally deferred unknown cards stacked while reviewing before a server refresh lands", async () => {
@@ -68,17 +83,18 @@ describe("MemorizeQueue", () => {
 
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
     await user.click(screen.getByRole("button", { name: /모름/ }));
-    await waitFor(() => expect(reviewAction).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(inPlaceReviewAction).toHaveBeenCalledTimes(1));
 
-    expect(reviewAction).toHaveBeenNthCalledWith(1, first.id, "unknown", "/memorize?defer=expression-1", expect.any(FormData));
-    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+    expect(inPlaceReviewAction).toHaveBeenNthCalledWith(1, first.id, "unknown");
+    expectPromptVisible("두 번째 한국어");
 
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
     await user.click(screen.getByRole("button", { name: /모름/ }));
-    await waitFor(() => expect(reviewAction).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(inPlaceReviewAction).toHaveBeenCalledTimes(2));
 
-    expect(reviewAction).toHaveBeenNthCalledWith(2, second.id, "unknown", "/memorize?defer=expression-1%2Cexpression-2", expect.any(FormData));
-    expect(screen.getByText("세 번째 한국어")).toBeInTheDocument();
+    expect(inPlaceReviewAction).toHaveBeenNthCalledWith(2, second.id, "unknown");
+    expectPromptVisible("세 번째 한국어");
+    expect(redirectReviewAction).not.toHaveBeenCalled();
   });
 
   it("updates the remaining count optimistically only after remembered reviews", async () => {
@@ -105,12 +121,12 @@ describe("MemorizeQueue", () => {
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
     await user.click(screen.getByRole("button", { name: /모름/ }));
 
-    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+    expectPromptVisible("두 번째 한국어");
 
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
     await user.click(screen.getByRole("button", { name: /모름/ }));
 
-    expect(screen.getByText("첫 번째 한국어")).toBeInTheDocument();
+    expectPromptVisible("첫 번째 한국어");
     expect(screen.getByText("틀림 1회")).toBeInTheDocument();
   });
 
@@ -120,7 +136,7 @@ describe("MemorizeQueue", () => {
 
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
     await user.click(screen.getByRole("button", { name: /외웠음/ }));
-    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+    expectPromptVisible("두 번째 한국어");
 
     await user.click(screen.getByRole("button", { name: /정답 보기/ }));
     await user.click(screen.getByRole("button", { name: /외웠음/ }));
@@ -151,8 +167,8 @@ describe("MemorizeQueue", () => {
 
     render(<MemorizeQueue expressions={[first, second, third]} />);
 
-    await waitFor(() => expect(screen.getByText("두 번째 한국어")).toBeInTheDocument());
-    expect(screen.queryByText("첫 번째 한국어")).not.toBeInTheDocument();
+    await waitFor(() => expectPromptVisible("두 번째 한국어"));
+    expectPromptAbsent("첫 번째 한국어");
     expect(screen.queryByText("복습 준비 중…")).not.toBeInTheDocument();
   });
 
@@ -167,8 +183,8 @@ describe("MemorizeQueue", () => {
     unmount();
     render(<MemorizeQueue expressions={[first, second, third]} />);
 
-    await waitFor(() => expect(screen.getByText("두 번째 한국어")).toBeInTheDocument());
-    expect(screen.queryByText("첫 번째 한국어")).not.toBeInTheDocument();
+    await waitFor(() => expectPromptVisible("두 번째 한국어"));
+    expectPromptAbsent("첫 번째 한국어");
   });
 
   it("drops stale stored cards that are no longer in the server queue", async () => {
@@ -183,8 +199,8 @@ describe("MemorizeQueue", () => {
 
     render(<MemorizeQueue expressions={[third, first]} deferredIds={[first.id]} />);
 
-    await waitFor(() => expect(screen.getByText("세 번째 한국어")).toBeInTheDocument());
-    expect(screen.queryByText("두 번째 한국어")).not.toBeInTheDocument();
+    await waitFor(() => expectPromptVisible("세 번째 한국어"));
+    expectPromptAbsent("두 번째 한국어");
     await waitFor(() => expect(window.sessionStorage.getItem("english:memorize-session:v1")).not.toContain(second.id));
   });
 
@@ -197,7 +213,7 @@ describe("MemorizeQueue", () => {
 
     rerender(<MemorizeQueue expressions={[second, third, first]} deferredIds={[first.id]} />);
 
-    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
-    expect(screen.queryByText("세 번째 한국어")).not.toBeInTheDocument();
+    expectPromptVisible("두 번째 한국어");
+    expectPromptAbsent("세 번째 한국어");
   });
 });
