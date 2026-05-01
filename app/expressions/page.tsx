@@ -5,18 +5,34 @@ import { TopicFilterSelect } from "@/components/TopicFilterSelect";
 import { requireCurrentUser } from "@/lib/auth";
 import { getExpressionStore } from "@/lib/lesson-store";
 import { sortExpressionsByPriority } from "@/lib/expression-priority";
+import type { ExpressionDay } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+type ExpressionDayListItem = ExpressionDay & {
+  folder_path?: string[] | string | null;
+  folderPath?: string | null;
+  folder?: {
+    path?: string | null;
+    name?: string | null;
+  };
+};
 
 type SearchParams = Promise<{ day?: string; topic?: string }>;
 
 export default async function ExpressionsPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireCurrentUser();
   const params = await searchParams;
-  const days = await getExpressionStore(user).listExpressionDays();
-  const selectedTopicId = pickSelectedTopicId(days, params.topic ?? params.day);
+  const days = await getExpressionStore(user).listExpressionDays() as ExpressionDayListItem[];
+  const requestedTopicId = params.topic ?? params.day;
+  const requestedTopicBlocked = Boolean(requestedTopicId && !days.some((day) => day.id === requestedTopicId));
+  const selectedTopicId = pickSelectedTopicId(days, requestedTopicId);
   const selectedDay = days.find((day) => day.id === selectedTopicId) ?? null;
-  const topicOptions = days.map((day) => ({ id: day.id, label: day.title }));
+  const topicOptions = days.map((day) => ({
+    id: day.id,
+    label: getTopicDisplayLabel(day),
+    depth: getTopicDepth(day)
+  }));
   const visibleDays = selectedDay ? [{ ...selectedDay, expressions: sortExpressionsByPriority(selectedDay.expressions) }] : [];
 
   return (
@@ -24,6 +40,9 @@ export default async function ExpressionsPage({ searchParams }: { searchParams: 
       <div><p className="text-sm font-black uppercase tracking-[0.2em] text-teal-700">표현</p><h1 className="mt-2 text-3xl font-black text-ink">표현 모아보기</h1><p className="mt-3 text-sm leading-6 text-slate-600">토픽을 하나 골라 배운 표현만 깔끔하게 확인하세요.</p></div>
       {visibleDays.length === 0 ? <EmptyState title="아직 표현이 없습니다" body="배운 표현이 생기면 토픽별로 여기에 쌓입니다." actionHref="/memorize" actionLabel="암기 화면 보기" /> : (
         <div className="space-y-5">
+          {requestedTopicBlocked ? (
+            <p className="text-sm text-amber-700" role="status" aria-live="polite">요청한 토픽에는 접근할 수 없어서 첫 번째 토픽으로 이동했습니다.</p>
+          ) : null}
           <TopicFilterSelect options={topicOptions} selectedId={selectedTopicId ?? visibleDays[0].id} />
           {visibleDays.map((day) => (
             <section key={day.id} className="space-y-3">
@@ -57,4 +76,22 @@ export default async function ExpressionsPage({ searchParams }: { searchParams: 
 function pickSelectedTopicId(days: { id: string }[], requestedId?: string) {
   if (requestedId && days.some((day) => day.id === requestedId)) return requestedId;
   return days[0]?.id ?? null;
+}
+
+function getFolderPath(day: ExpressionDayListItem): string | null {
+  if (Array.isArray(day.folder_path)) return day.folder_path.join(" / ");
+  return day.folder_path ?? day.folderPath ?? day.folder?.path ?? null;
+}
+
+function getTopicDepth(day: ExpressionDayListItem): number {
+  const path = getFolderPath(day);
+  if (!path) return 0;
+  const separators = path.split("/");
+  if (!separators[0]) return 0;
+  return Math.max(0, separators.length - 1);
+}
+
+function getTopicDisplayLabel(day: ExpressionDayListItem) {
+  const folderPath = getFolderPath(day);
+  return folderPath ? `${folderPath} / ${day.title}` : day.title;
 }

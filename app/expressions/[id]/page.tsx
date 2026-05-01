@@ -19,7 +19,7 @@ export default async function ExpressionDetailPage({ params }: { params: Params 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-500">
           <span>틀림 {expression.unknown_count}회 · 외움 {expression.known_count}회</span>
-          {expression.day ? <Link href={`/expressions?day=${expression.day.id}`} className="text-teal-700">{expression.day.title}</Link> : null}
+          {expression.day ? <Link href={`/expressions?topic=${expression.day.id}`} className="text-teal-700">{expression.day.title}</Link> : null}
         </div>
         <h1 className="text-3xl font-black text-ink">{expression.english}</h1>
         <p className="text-lg font-semibold leading-7 text-slate-700">{expression.korean_prompt}</p>
