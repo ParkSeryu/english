@@ -13,6 +13,7 @@ import type {
   ExpressionCard,
   ExpressionDay,
   ExpressionDaySummary,
+  ContentFolderSummary,
   ExpressionExample,
   ExpressionIngestionPayload,
   ExpressionProgress,
@@ -25,12 +26,25 @@ import type {
 
 type SupabaseLike = Awaited<ReturnType<typeof createServerSupabaseClient>> | ReturnType<typeof createServiceRoleSupabaseClient>;
 
-type SupabaseExpressionRow = Omit<ExpressionCard, "examples" | "day"> & {
-  expression_examples?: ExpressionExample[] | null;
-  expression_days?: ExpressionDaySummary | null;
+type SupabaseContentFolderSummary = Pick<ContentFolderSummary, "id" | "name" | "slug" | "parent_id"> & {
+  path_names: string[] | null;
 };
 
-type SupabaseExpressionDayRow = Omit<ExpressionDay, "expressions"> & {
+type SupabaseExpressionDaySummary = Omit<ExpressionDaySummary, "folder_id" | "folder" | "folder_path"> & {
+  folder_id: string | null;
+  content_folders?: SupabaseContentFolderSummary | SupabaseContentFolderSummary[] | null;
+};
+
+type SupabaseExpressionRow = Omit<ExpressionCard, "due_at" | "interval_days" | "examples" | "day"> & {
+  due_at?: string | null;
+  interval_days?: number;
+  expression_examples?: ExpressionExample[] | null;
+  expression_days?: SupabaseExpressionDaySummary | SupabaseExpressionDaySummary[] | null;
+};
+
+type SupabaseExpressionDayRow = Omit<ExpressionDay, "expressions" | "folder" | "folder_path"> & {
+  folder_id: string | null;
+  content_folders?: SupabaseContentFolderSummary | SupabaseContentFolderSummary[] | null;
   expressions?: SupabaseExpressionRow[] | null;
 };
 
@@ -41,6 +55,12 @@ type QuestionStats = Pick<QuestionNote, "status">;
 
 const EXPRESSION_CARD_COLUMNS = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at";
 const EXPRESSION_STATS_COLUMNS = "id, known_count, unknown_count, review_count, last_result, last_reviewed_at, source_order, created_at";
+const EXPRESSION_DAY_COLUMNS = "id,owner_id,title,raw_input,source_note,day_date,folder_id,created_by,created_at,updated_at";
+const LEGACY_EXPRESSION_DAY_COLUMNS = "id,owner_id,title,raw_input,source_note,day_date,created_by,created_at,updated_at";
+const EXPRESSION_DAY_WITH_CARDS_SELECT = `${EXPRESSION_DAY_COLUMNS},expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))`;
+const LEGACY_EXPRESSION_DAY_WITH_CARDS_SELECT = `${LEGACY_EXPRESSION_DAY_COLUMNS},expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))`;
+const EXPRESSION_WITH_DAY_SELECT = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,title,source_note,day_date,folder_id)";
+const LEGACY_EXPRESSION_WITH_DAY_SELECT = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,title,source_note,day_date)";
 
 export interface ExpressionStore {
   listExpressionDays(): Promise<ExpressionDay[]>;
@@ -92,27 +112,101 @@ function normalizeGrammarNote(note: string | null | undefined) {
   return compactNote;
 }
 
+function isFolderSchemaUnavailableError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "";
+  const text = [candidate.message, candidate.details, candidate.hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    ["42703", "42P01", "42883", "PGRST200", "PGRST204", "PGRST202"].includes(code)
+    || text.includes("folder_id")
+    || text.includes("content_folders")
+    || text.includes("can_read_content_folder")
+    || text.includes("schema cache")
+  );
+}
+
+function logFolderSchemaFallback(scope: string, error: unknown) {
+  const message = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String((error as { message?: unknown }).message) : String(error);
+  console.warn(`[topic-folder-access] ${scope}: folder schema unavailable, falling back to legacy read`, message);
+}
+
+function normalizeFolder(summary: unknown): ContentFolderSummary | null {
+  if (!summary || typeof summary !== "object") return null;
+  if (Array.isArray(summary)) return normalizeFolder(summary[0]);
+
+  const candidate = summary as Partial<SupabaseContentFolderSummary>;
+  if (typeof candidate.id !== "string" || !candidate.id) return null;
+  const pathNames = Array.isArray(candidate.path_names)
+    ? candidate.path_names.filter((name): name is string => typeof name === "string")
+    : [];
+
+  return {
+    id: candidate.id,
+    name: String(candidate.name ?? ""),
+    slug: String(candidate.slug ?? ""),
+    parent_id: typeof candidate.parent_id === "string" ? candidate.parent_id : null,
+    path_names: pathNames
+  };
+}
+
 function normalizeExpression(row: SupabaseExpressionRow): ExpressionCard {
-  const { expression_examples: examples, expression_days, ...expression } = row;
+  const { expression_examples: examples, due_at, interval_days, expression_days, ...expression } = row;
+  const relationBase = Array.isArray(expression_days) ? expression_days[0] : expression_days;
+  const relation = relationBase ?? null;
+  const normalizedFolder = normalizeFolder(relation?.content_folders);
+  const dayFolder = relation
+    ? {
+        id: relation.id,
+        title: relation.title,
+        source_note: relation.source_note,
+        day_date: relation.day_date,
+        folder_id: relation.folder_id ?? null,
+        folder: normalizedFolder,
+        folder_path: normalizedFolder?.path_names ?? []
+      }
+    : undefined;
+
   return {
     ...expression,
-    day: expression_days ?? undefined,
+    due_at: due_at ?? null,
+    interval_days: interval_days ?? 0,
+    day: dayFolder,
     examples: [...(examples ?? [])].sort((a, b) => a.sort_order - b.sort_order)
   };
 }
 
 function normalizeExpressionDay(row: SupabaseExpressionDayRow): ExpressionDay {
   const { expressions, ...day } = row;
+  const normalizedFolder = normalizeFolder(day.content_folders);
   return {
     ...day,
+    folder: normalizedFolder,
+    folder_path: normalizedFolder?.path_names ?? [],
     expressions: [...(expressions ?? [])].map(normalizeExpression).sort((a, b) => a.source_order - b.source_order)
   };
+}
+
+async function resolveDefaultWritableFolder(supabase: SupabaseLike) {
+  const { data, error } = await supabase
+    .from("content_folders")
+    .select("id")
+    .eq("slug", "legacy-root")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) raiseStoreError("supabase query", error);
+  if (!data?.id) throw new Error("기본 표현 폴더를 찾을 수 없습니다.");
+  return data.id as string;
 }
 
 function normalizeIngestionRun(row: SupabaseIngestionRunRow): IngestionRun {
   return { ...row, normalized_payload: assertPayload(row.normalized_payload as ExpressionIngestionPayload) };
 }
-
 
 function raiseStoreError(operation: string, error: unknown): never {
   console.error(`[ExpressionStore] ${operation} failed`, error);
@@ -191,6 +285,67 @@ class SupabaseExpressionStore implements ExpressionStore {
     return createServiceRoleSupabaseClient();
   }
 
+  private async foldersForIds(folderIds: Array<string | null | undefined>) {
+    const uniqueFolderIds = [...new Set(folderIds.filter((id): id is string => typeof id === "string" && id.length > 0))];
+    if (uniqueFolderIds.length === 0) return new Map<string, ContentFolderSummary>();
+
+    const { data, error } = await this.contentSupabase()
+      .from("content_folders")
+      .select("id,name,slug,parent_id,path_names")
+      .in("id", uniqueFolderIds);
+    if (error) {
+      if (isFolderSchemaUnavailableError(error)) {
+        logFolderSchemaFallback("foldersForIds", error);
+        return new Map<string, ContentFolderSummary>();
+      }
+      raiseStoreError("supabase query", error);
+    }
+
+    return new Map((data ?? []).map((row) => {
+      const folder = normalizeFolder(row);
+      return folder ? [folder.id, folder] : null;
+    }).filter((entry): entry is [string, ContentFolderSummary] => entry !== null));
+  }
+
+  private async hydrateExpressionDays(days: ExpressionDay[]) {
+    const folders = await this.foldersForIds(days.map((day) => day.folder_id));
+    return days.map((day) => {
+      const folder = day.folder_id ? folders.get(day.folder_id) ?? null : null;
+      return {
+        ...day,
+        folder,
+        folder_path: folder?.path_names ?? [],
+        expressions: day.expressions.map((card) => ({
+          ...card,
+          day: card.day
+            ? {
+                ...card.day,
+                folder_id: day.folder_id ?? null,
+                folder,
+                folder_path: folder?.path_names ?? []
+              }
+            : card.day
+        }))
+      };
+    });
+  }
+
+  private async hydrateExpressionCards(cards: ExpressionCard[]) {
+    const folders = await this.foldersForIds(cards.map((card) => card.day?.folder_id));
+    return cards.map((card) => {
+      if (!card.day) return card;
+      const folder = card.day.folder_id ? folders.get(card.day.folder_id) ?? null : null;
+      return {
+        ...card,
+        day: {
+          ...card.day,
+          folder,
+          folder_path: folder?.path_names ?? []
+        }
+      };
+    });
+  }
+
   private async progressFor(expressionIds: string[]) {
     if (expressionIds.length === 0) return new Map<string, ExpressionProgress>();
     const { data, error } = await (await this.supabase())
@@ -220,52 +375,91 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   async listExpressionDays() {
     const supabase = this.contentSupabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("expression_days")
-      .select("*, expressions(*, expression_examples(*))")
+      .select(EXPRESSION_DAY_WITH_CARDS_SELECT)
       .order("day_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("listExpressionDays", error);
+      const legacyResult = await supabase
+        .from("expression_days")
+        .select(LEGACY_EXPRESSION_DAY_WITH_CARDS_SELECT)
+        .order("day_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) raiseStoreError("supabase query", error);
-    const days = (data ?? []).map((row: SupabaseExpressionDayRow) => normalizeExpressionDay(row));
+    const days = await this.hydrateExpressionDays((data ?? []).map((row: SupabaseExpressionDayRow) => normalizeExpressionDay(row)));
     const progress = await this.progressFor(days.flatMap((day) => day.expressions.map((card) => card.id)));
     return days.map((day) => ({ ...day, expressions: day.expressions.map((card) => applyProgress(card, progress.get(card.id))) }));
   }
 
   async getExpressionDay(id: string) {
     const supabase = this.contentSupabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("expression_days")
-      .select("*, expressions(*, expression_examples(*))")
+      .select(EXPRESSION_DAY_WITH_CARDS_SELECT)
       .eq("id", id)
       .maybeSingle();
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("getExpressionDay", error);
+      const legacyResult = await supabase
+        .from("expression_days")
+        .select(LEGACY_EXPRESSION_DAY_WITH_CARDS_SELECT)
+        .eq("id", id)
+        .maybeSingle();
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) raiseStoreError("supabase query", error);
     if (!data) return null;
-    const day = normalizeExpressionDay(data as SupabaseExpressionDayRow);
+    const [day] = await this.hydrateExpressionDays([normalizeExpressionDay(data as SupabaseExpressionDayRow)]);
     const progress = await this.progressFor(day.expressions.map((card) => card.id));
     return { ...day, expressions: day.expressions.map((card) => applyProgress(card, progress.get(card.id))) };
   }
 
   async getExpression(id: string) {
     const supabase = this.contentSupabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("expressions")
-      .select("*, expression_examples(*), expression_days(id,title,source_note,day_date)")
+      .select(EXPRESSION_WITH_DAY_SELECT)
       .eq("id", id)
       .maybeSingle();
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("getExpression", error);
+      const legacyResult = await supabase
+        .from("expressions")
+        .select(LEGACY_EXPRESSION_WITH_DAY_SELECT)
+        .eq("id", id)
+        .maybeSingle();
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) raiseStoreError("supabase query", error);
     if (!data) return null;
-    const card = normalizeExpression(data as SupabaseExpressionRow);
+    const [card] = await this.hydrateExpressionCards([normalizeExpression(data as SupabaseExpressionRow)]);
     return applyProgress(card, await this.progressForOne(card.id));
   }
 
   private async listExpressions() {
     const supabase = this.contentSupabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("expressions")
-      .select("*, expression_examples(*), expression_days(id,title,source_note,day_date)")
+      .select(EXPRESSION_WITH_DAY_SELECT)
       .order("source_order", { ascending: true });
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("listExpressions", error);
+      const legacyResult = await supabase
+        .from("expressions")
+        .select(LEGACY_EXPRESSION_WITH_DAY_SELECT)
+        .order("source_order", { ascending: true });
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) raiseStoreError("supabase query", error);
-    return this.applyUserProgress((data ?? []).map((row: SupabaseExpressionRow) => normalizeExpression(row)));
+    return this.applyUserProgress(await this.hydrateExpressionCards((data ?? []).map((row: SupabaseExpressionRow) => normalizeExpression(row))));
   }
 
   private async listExpressionStats() {
@@ -286,15 +480,27 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   private async listRecentExpressionDays(limit: number) {
     if (limit <= 0) return [];
-    const { data, error } = await this.contentSupabase()
+    const supabase = this.contentSupabase();
+    let { data, error } = await supabase
       .from("expression_days")
-      .select(`*, expressions(${EXPRESSION_CARD_COLUMNS})`)
+      .select(`${EXPRESSION_DAY_COLUMNS},expressions(${EXPRESSION_CARD_COLUMNS})`)
       .order("day_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(limit);
+    if (error && isFolderSchemaUnavailableError(error)) {
+      logFolderSchemaFallback("listRecentExpressionDays", error);
+      const legacyResult = await supabase
+        .from("expression_days")
+        .select(`${LEGACY_EXPRESSION_DAY_COLUMNS},expressions(${EXPRESSION_CARD_COLUMNS})`)
+        .order("day_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      data = legacyResult.data as typeof data;
+      error = legacyResult.error;
+    }
     if (error) raiseStoreError("supabase query", error);
-    return (data ?? []).map((row: SupabaseExpressionDayRow) => {
-      const day = normalizeExpressionDay(row);
+    const days = await this.hydrateExpressionDays((data ?? []).map((row: SupabaseExpressionDayRow) => normalizeExpressionDay(row)));
+    return days.map((day) => {
       return { ...day, expressions: day.expressions.map((card) => applyProgress(card, null)) };
     });
   }
@@ -454,6 +660,7 @@ class SupabaseExpressionStore implements ExpressionStore {
     let createdDayId: string | null = null;
     try {
       const requestedDayDate = run.normalized_payload.expression_day.day_date ?? null;
+      const defaultFolderId = await resolveDefaultWritableFolder(supabase);
       if (requestedDayDate) {
         const { data: existingDay, error: existingDayError } = await supabase
           .from("expression_days")
@@ -476,6 +683,7 @@ class SupabaseExpressionStore implements ExpressionStore {
             raw_input: run.normalized_payload.expression_day.raw_input,
             source_note: run.normalized_payload.expression_day.source_note ?? null,
             day_date: requestedDayDate,
+            folder_id: defaultFolderId,
             created_by: "llm",
             updated_at: timestamp
           })
