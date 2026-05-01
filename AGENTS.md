@@ -36,10 +36,17 @@ This repo follows the workspace-level OMX/autonomous-agent instructions. The fol
 ## Database and Supabase environment boundaries
 
 - Treat `dev` and `main` as using separate Supabase/database environments unless the user explicitly says otherwise.
+- Current environment mapping:
+  - `dev` / Codex Supabase MCP / `.env.local` points to Supabase project `uixpyibcpleuwsgemdno`.
+  - `main` / production DB / `.env.main.local` points to Supabase project `ccawzrrkxuirrwvaecvw`.
 - The currently configured Codex Supabase MCP connection is scoped to the **dev** Supabase project, not the main/production database.
-- Before reading or writing hosted Supabase data, state which environment is being targeted (`dev` MCP, local `.env.local`, or main/production) and verify the project ref/host when possible.
+- Before reading or writing hosted Supabase data, state which environment is being targeted (`dev` MCP / `.env.local` or `main` / `.env.main.local`) and verify the project ref/host.
 - Do not assume a migration or data fix applied through the dev MCP has also been applied to main/production; apply or verify each environment separately.
 - When promoting code from `dev` to `main`, separately confirm whether any schema/data changes must be applied to the main/production database.
+- For schema/RLS migrations, verify both databases when relevant:
+  - service-role/admin reads can confirm tables, rows, folders, and RPC existence;
+  - an authenticated-user read smoke should confirm RLS actually allows `content_folders`, `expression_days`, and `expressions` where applicable;
+  - do not claim a migration is live in an environment unless that environment was checked directly.
 
 ## Local dev server access
 
