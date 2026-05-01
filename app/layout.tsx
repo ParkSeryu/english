@@ -5,7 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { AppNav } from "@/components/AppNav";
-import { MobileZoomGuard } from "@/components/MobileZoomGuard";
+import { MobileZoomGuardScript } from "@/components/MobileZoomGuardScript";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { getCurrentUser } from "@/lib/auth";
@@ -79,7 +79,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="ko">
       <body className={inter.className}>
         <ServiceWorkerRegistration />
-        <MobileZoomGuard />
+        <MobileZoomGuardScript />
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>

@@ -1,7 +1,12 @@
-import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { MobileZoomGuard } from "@/components/MobileZoomGuard";
+import { mobileZoomGuardScript } from "@/components/MobileZoomGuardScript";
+
+declare global {
+  interface Window {
+    __mobileZoomGuardInstalled?: boolean;
+  }
+}
 
 function touchMoveEvent(touchCount: number) {
   const event = new Event("touchmove", { bubbles: true, cancelable: true });
@@ -11,9 +16,10 @@ function touchMoveEvent(touchCount: number) {
   return event;
 }
 
-describe("MobileZoomGuard", () => {
+describe("mobileZoomGuardScript", () => {
   it("prevents pinch zoom gestures while leaving single-touch scrolling alone", () => {
-    const { unmount } = render(<MobileZoomGuard />);
+    window.__mobileZoomGuardInstalled = false;
+    new Function(mobileZoomGuardScript)();
 
     const singleTouchMove = touchMoveEvent(1);
     document.dispatchEvent(singleTouchMove);
@@ -26,11 +32,5 @@ describe("MobileZoomGuard", () => {
     const webkitGesture = new Event("gesturestart", { bubbles: true, cancelable: true });
     document.dispatchEvent(webkitGesture);
     expect(webkitGesture.defaultPrevented).toBe(true);
-
-    unmount();
-
-    const afterCleanup = touchMoveEvent(2);
-    document.dispatchEvent(afterCleanup);
-    expect(afterCleanup.defaultPrevented).toBe(false);
   });
 });
