@@ -31,6 +31,14 @@ This repo follows the workspace-level OMX/autonomous-agent instructions. The fol
 - Before any merge/push handoff, state the source branch/worktree and confirm the target branch is `dev`.
 - After a feature/fix branch has been successfully integrated into the target branch and pushed, delete the merged source branch both locally and remotely when it is no longer needed; do not leave stale task branches behind.
 
+## Database and Supabase environment boundaries
+
+- Treat `dev` and `main` as using separate Supabase/database environments unless the user explicitly says otherwise.
+- The currently configured Codex Supabase MCP connection is scoped to the **dev** Supabase project, not the main/production database.
+- Before reading or writing hosted Supabase data, state which environment is being targeted (`dev` MCP, local `.env.local`, or main/production) and verify the project ref/host when possible.
+- Do not assume a migration or data fix applied through the dev MCP has also been applied to main/production; apply or verify each environment separately.
+- When promoting code from `dev` to `main`, separately confirm whether any schema/data changes must be applied to the main/production database.
+
 ## Local dev server access
 
 - When the user asks to run, open, or restart the dev server, bind it to `0.0.0.0` unless they explicitly request localhost-only.
