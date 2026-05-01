@@ -9,11 +9,14 @@ import type { ExpressionCard } from "@/lib/types";
 const DEFAULT_STORAGE_KEY = "english:memorize-session:v1";
 const EMPTY_DEFERRED_IDS: string[] = [];
 
+type OptimisticUnknownCounts = Record<string, number>;
+
 type QueueState = {
   signature: string;
   queueIds: string[];
   activeId: string | null;
   deferredIds: string[];
+  optimisticUnknownCounts: OptimisticUnknownCounts;
 };
 
 type StoredQueueState = {
@@ -62,13 +65,22 @@ function orderedExpressions(expressions: ExpressionCard[], queueIds: string[]) {
   return [...ordered, ...expressions.filter((expression) => !orderedIds.has(expression.id))];
 }
 
+function withOptimisticUnknownCounts(expressions: ExpressionCard[], optimisticUnknownCounts: OptimisticUnknownCounts) {
+  return expressions.map((expression) => {
+    const optimisticUnknownCount = optimisticUnknownCounts[expression.id];
+    if (!optimisticUnknownCount || optimisticUnknownCount <= expression.unknown_count) return expression;
+    return { ...expression, unknown_count: optimisticUnknownCount };
+  });
+}
+
 function defaultQueueState(signature: string, expressions: ExpressionCard[], deferredIds: string[]): QueueState {
   const queueIds = expressions.map((expression) => expression.id);
   return {
     signature,
     queueIds,
     activeId: queueIds[0] ?? null,
-    deferredIds: normalizeDeferredIds(deferredIds, expressions)
+    deferredIds: normalizeDeferredIds(deferredIds, expressions),
+    optimisticUnknownCounts: {}
   };
 }
 
@@ -120,7 +132,8 @@ function reconcileQueueState(signature: string, expressions: ExpressionCard[], d
     signature,
     queueIds,
     activeId,
-    deferredIds: normalizedDeferredIds
+    deferredIds: normalizedDeferredIds,
+    optimisticUnknownCounts: {}
   };
 }
 
@@ -150,7 +163,7 @@ export function MemorizeQueue({ expressions, deferredIds, storageKey = DEFAULT_S
   const [sessionState, setSessionState] = useState<QueueState>(fallbackState);
   const [storageReady, setStorageReady] = useState(false);
   const activeState = sessionState.signature === propsSignature ? sessionState : fallbackState;
-  const queue = orderedExpressions(expressions, activeState.queueIds);
+  const queue = withOptimisticUnknownCounts(orderedExpressions(expressions, activeState.queueIds), activeState.optimisticUnknownCounts);
   const remainingCount = activeState.queueIds.length;
   const activeExpression = queue.find((expression) => expression.id === activeState.activeId) ?? queue[0];
 
@@ -163,17 +176,6 @@ export function MemorizeQueue({ expressions, deferredIds, storageKey = DEFAULT_S
     if (!storageReady || sessionState.signature !== propsSignature) return;
     writeStoredQueueState(storageKey, sessionState);
   }, [propsSignature, sessionState, storageKey, storageReady]);
-
-  if (!storageReady) {
-    return (
-      <div className="space-y-5">
-        <MemorizeQueueHeader remainingCount={remainingCount} />
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 text-center text-sm font-bold text-slate-500 shadow-card" aria-live="polite">
-          복습 준비 중…
-        </section>
-      </div>
-    );
-  }
 
   if (!activeExpression) {
     return (
@@ -194,7 +196,14 @@ export function MemorizeQueue({ expressions, deferredIds, storageKey = DEFAULT_S
         signature: propsSignature,
         queueIds: nextQueue.queueIds,
         activeId: nextQueue.activeId,
-        deferredIds: result === "unknown" ? appendDeferredId(currentState.deferredIds, activeExpression.id) : removeDeferredId(currentState.deferredIds, activeExpression.id)
+        deferredIds: result === "unknown" ? appendDeferredId(currentState.deferredIds, activeExpression.id) : removeDeferredId(currentState.deferredIds, activeExpression.id),
+        optimisticUnknownCounts:
+          result === "unknown"
+            ? {
+                ...currentState.optimisticUnknownCounts,
+                [activeExpression.id]: Math.max(currentState.optimisticUnknownCounts[activeExpression.id] ?? activeExpression.unknown_count, activeExpression.unknown_count) + 1
+              }
+            : currentState.optimisticUnknownCounts
       };
     });
   }

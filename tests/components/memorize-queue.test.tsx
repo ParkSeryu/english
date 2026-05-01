@@ -98,6 +98,22 @@ describe("MemorizeQueue", () => {
     expect(screen.getByText("복습할 표현 2개")).toBeInTheDocument();
   });
 
+  it("shows an optimistic unknown count when a deferred card returns before server refresh", async () => {
+    const user = userEvent.setup();
+    render(<MemorizeQueue expressions={[first, second]} />);
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+
+    expect(screen.getByText("두 번째 한국어")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /정답 보기/ }));
+    await user.click(screen.getByRole("button", { name: /모름/ }));
+
+    expect(screen.getByText("첫 번째 한국어")).toBeInTheDocument();
+    expect(screen.getByText("틀림 1회")).toBeInTheDocument();
+  });
+
   it("shows the empty memorization state immediately after the last card is remembered", async () => {
     const user = userEvent.setup();
     render(<MemorizeQueue expressions={[first, second]} />);
@@ -116,11 +132,11 @@ describe("MemorizeQueue", () => {
     expect(screen.queryByRole("button", { name: /정답 보기/ })).not.toBeInTheDocument();
   });
 
-  it("server-renders a preparation state before browser storage can restore the queue", () => {
+  it("server-renders the first card instead of blocking on browser storage", () => {
     const html = renderToString(<MemorizeQueue expressions={[first, second, third]} />);
 
-    expect(html).toContain("복습 준비 중…");
-    expect(html).not.toContain("첫 번째 한국어");
+    expect(html).toContain("첫 번째 한국어");
+    expect(html).not.toContain("복습 준비 중…");
   });
 
   it("restores the stored queue position after mounting", async () => {
