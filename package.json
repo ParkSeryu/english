@@ -17,7 +17,8 @@
     "verify": "npm run clean:runtime && npm run lint && npm run typecheck && npm test && npm run build && npm run clean:runtime && npm run test:e2e",
     "verify:rls": "bash scripts/verify-rls-local.sh",
     "clean:runtime": "rm -rf .next test-results playwright-report",
-    "verify:all": "npm run verify && npm run test:perf && npm run verify:rls"
+    "verify:all": "npm run verify && npm run test:perf && npm run verify:rls",
+    "sync:main-to-dev": "node scripts/sync-main-to-dev.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

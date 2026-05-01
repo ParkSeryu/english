@@ -20,6 +20,16 @@ function isProtectedPath(pathname: string) {
   return protectedPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+function redirectRootAuthCodeToCallback(request: NextRequest) {
+  if (request.nextUrl.pathname !== "/" || !request.nextUrl.searchParams.has("code")) return null;
+
+  const callbackUrl = new URL("/auth/callback", request.url);
+  request.nextUrl.searchParams.forEach((value, key) => callbackUrl.searchParams.append(key, value));
+  if (!callbackUrl.searchParams.has("next")) callbackUrl.searchParams.set("next", "/auth/update-password");
+
+  return NextResponse.redirect(callbackUrl);
+}
+
 function redirectToLogin(request: NextRequest) {
   const loginUrl = new URL("/login", request.url);
   const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
@@ -46,6 +56,9 @@ export async function middleware(request: NextRequest) {
 
   if (isE2EMemoryMode()) return nextWithHeaders(requestHeaders);
   if (!hasSupabaseEnv()) return nextWithHeaders(requestHeaders);
+
+  const rootAuthCodeRedirect = redirectRootAuthCodeToCallback(request);
+  if (rootAuthCodeRedirect) return rootAuthCodeRedirect;
 
   const pathname = request.nextUrl.pathname;
   const isPublicPath = pathname === "/" || pathname === "/login" || pathname.startsWith("/auth/");

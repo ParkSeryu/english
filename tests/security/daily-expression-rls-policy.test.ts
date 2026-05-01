@@ -43,9 +43,9 @@ describe("daily expression Supabase RLS migration", () => {
   });
 
   it("disambiguates content folder ACL function arguments from table columns", () => {
-    expect(migration).toContain("function public.can_read_content_folder(p_auth_user_id uuid, p_folder_id uuid)");
-    expect(migration).toContain("where cf.id = p_folder_id");
-    expect(migration).toContain("and m.user_id = p_auth_user_id");
+    expect(migration).toContain("function public.can_read_content_folder(auth_user_id uuid, folder_id uuid)");
+    expect(migration).toContain("where cf.id = $2");
+    expect(migration).toContain("and m.user_id = $1");
   });
 
   it("lets authenticated users read authorized content folders through the ACL helper", () => {
