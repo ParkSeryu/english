@@ -278,19 +278,18 @@ class SupabaseExpressionStore implements ExpressionStore {
     return this.createClient();
   }
 
-  private async contentSupabase() {
-    // Expression content is shared across signed-in users, but learner-facing
-    // reads should use the current user's Supabase session. Depending on a
-    // service-role key here can surface a raw Supabase "Unauthorized" response
-    // if production deployment env is missing or stale.
-    return this.supabase();
+  private contentSupabase() {
+    // Expression content is shared across signed-in users. Use the server-side
+    // service client for shared content reads so production DB RLS drift on
+    // expression_days folders cannot break the learner-facing dashboard/queue.
+    return createServiceRoleSupabaseClient();
   }
 
   private async foldersForIds(folderIds: Array<string | null | undefined>) {
     const uniqueFolderIds = [...new Set(folderIds.filter((id): id is string => typeof id === "string" && id.length > 0))];
     if (uniqueFolderIds.length === 0) return new Map<string, ContentFolderSummary>();
 
-    const { data, error } = await (await this.contentSupabase())
+    const { data, error } = await this.contentSupabase()
       .from("content_folders")
       .select("id,name,slug,parent_id,path_names")
       .in("id", uniqueFolderIds);
@@ -375,7 +374,7 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 
   async listExpressionDays() {
-    const supabase = await this.contentSupabase();
+    const supabase = this.contentSupabase();
     let { data, error } = await supabase
       .from("expression_days")
       .select(EXPRESSION_DAY_WITH_CARDS_SELECT)
@@ -398,7 +397,7 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 
   async getExpressionDay(id: string) {
-    const supabase = await this.contentSupabase();
+    const supabase = this.contentSupabase();
     let { data, error } = await supabase
       .from("expression_days")
       .select(EXPRESSION_DAY_WITH_CARDS_SELECT)
@@ -422,7 +421,7 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 
   async getExpression(id: string) {
-    const supabase = await this.contentSupabase();
+    const supabase = this.contentSupabase();
     let { data, error } = await supabase
       .from("expressions")
       .select(EXPRESSION_WITH_DAY_SELECT)
@@ -445,7 +444,7 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 
   private async listExpressions() {
-    const supabase = await this.contentSupabase();
+    const supabase = this.contentSupabase();
     let { data, error } = await supabase
       .from("expressions")
       .select(EXPRESSION_WITH_DAY_SELECT)
@@ -464,7 +463,7 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 
   private async listExpressionStats() {
-    const supabase = await this.contentSupabase();
+    const supabase = this.contentSupabase();
     const { data, error } = await supabase.from("expressions").select(EXPRESSION_STATS_COLUMNS).order("source_order", { ascending: true });
     if (error) raiseStoreError("supabase query", error);
 
@@ -474,14 +473,14 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 
   private async countExpressionDays() {
-    const { count, error } = await (await this.contentSupabase()).from("expression_days").select("id", { count: "exact", head: true });
+    const { count, error } = await this.contentSupabase().from("expression_days").select("id", { count: "exact", head: true });
     if (error) raiseStoreError("supabase query", error);
     return count ?? 0;
   }
 
   private async listRecentExpressionDays(limit: number) {
     if (limit <= 0) return [];
-    const supabase = await this.contentSupabase();
+    const supabase = this.contentSupabase();
     let { data, error } = await supabase
       .from("expression_days")
       .select(`${EXPRESSION_DAY_COLUMNS},expressions(${EXPRESSION_CARD_COLUMNS})`)

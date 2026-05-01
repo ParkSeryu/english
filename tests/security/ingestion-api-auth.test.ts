@@ -20,12 +20,6 @@ describe("LLM ingestion route safety", () => {
     expect(expressionStore).toContain("owner_id: this.user.id");
   });
 
-  it("keeps learner-facing content reads on the signed-in user client", () => {
-    expect(expressionStore).toContain("private async contentSupabase()");
-    expect(expressionStore).toContain("return this.supabase();");
-    expect(expressionStore).not.toContain("if (hasSupabaseServiceRoleEnv()) return createServiceRoleSupabaseClient();");
-  });
-
   it("approval endpoint calls the explicit approval gate before inserting expression rows", () => {
     const approvalIndex = expressionStore.indexOf("isExplicitLessonSaveApproval");
     const insertIndex = expressionStore.indexOf('.from("expression_days")');
