@@ -42,6 +42,12 @@ describe("daily expression Supabase RLS migration", () => {
     expect(migration).toContain("auth.uid() is not null");
   });
 
+  it("disambiguates content folder ACL function arguments from table columns", () => {
+    expect(migration).toContain("function public.can_read_content_folder(p_auth_user_id uuid, p_folder_id uuid)");
+    expect(migration).toContain("where cf.id = p_folder_id");
+    expect(migration).toContain("and m.user_id = p_auth_user_id");
+  });
+
   it("removes authenticated write policies from shared expression content", () => {
     expect(migration).toContain('drop policy if exists "expression_days_insert_own"');
     expect(migration).toContain('drop policy if exists "expressions_insert_owned_day"');
