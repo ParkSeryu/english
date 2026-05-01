@@ -5,10 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 export type TopicFilterOption = {
   id: string;
   label: string;
-  /**
-   * Optional folder nesting depth for nested-topic display.
-   */
-  depth?: number;
 };
 
 export function TopicFilterSelect({ options, selectedId }: { options: TopicFilterOption[]; selectedId: string }) {
@@ -29,11 +25,7 @@ export function TopicFilterSelect({ options, selectedId }: { options: TopicFilte
         aria-label="표현 토픽 선택"
       >
         {options.map((option) => (
-          <option
-            key={option.id}
-            value={option.id}
-            style={{ paddingLeft: `${Math.max(0, option.depth ?? 0) * 1.25}rem` }}
-          >
+          <option key={option.id} value={option.id}>
             {option.label}
           </option>
         ))}

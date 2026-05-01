@@ -35,10 +35,9 @@ describe("daily expression Supabase RLS migration", () => {
   });
 
   it("defines shared read policies for expression content", () => {
-    expect(migration).toContain('create policy "expression_days_select_authorized"');
-    expect(migration).toContain('create policy "expressions_select_authorized"');
-    expect(migration).toContain('create policy "expression_examples_select_authorized_expression"');
-    expect(migration).toContain("can_read_content_folder(auth.uid(), folder_id)");
+    expect(migration).toContain('create policy "expression_days_select_shared"');
+    expect(migration).toContain('create policy "expressions_select_shared"');
+    expect(migration).toContain('create policy "expression_examples_select_shared_expression"');
     expect(migration).toContain("auth.uid() is not null");
   });
 

@@ -8,23 +8,11 @@ export type UserIdentity = {
   email?: string | null;
 };
 
-export type ContentFolderSummary = {
-  id: string;
-  name: string;
-  slug: string;
-  path_names: string[];
-  parent_id: string | null;
-};
-
 export type ExpressionDaySummary = {
   id: string;
   title: string;
   source_note: string | null;
   day_date: string | null;
-  folder_id?: string | null;
-  folder?: ContentFolderSummary | null;
-  /** Precomputed folder path from root to current folder for display formatting. */
-  folder_path?: string[];
 };
 
 export type ExpressionExample = {
@@ -73,10 +61,6 @@ export type ExpressionDay = {
   raw_input: string;
   source_note: string | null;
   day_date: string | null;
-  folder_id?: string | null;
-  folder?: ContentFolderSummary | null;
-  /** Precomputed folder path from root to current folder for display formatting. */
-  folder_path?: string[];
   created_by: "llm" | "user";
   created_at: string;
   updated_at: string;
