@@ -29,6 +29,7 @@ export default async function ExpressionDetailPage({ params }: { params: Params 
         {expression.examples.length > 0 ? <section className="rounded-3xl bg-white p-5 shadow-card"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">비슷한 표현</h2><ul className="mt-3 space-y-3">{expression.examples.map((example) => <li key={example.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-ink">{example.example_text}</p>{example.meaning_ko ? <p className="mt-1 text-sm text-slate-600">{example.meaning_ko}</p> : null}</li>)}</ul></section> : null}
       </div>
       <ExpressionMemoForm expression={expression} />
+      <Link href="/expressions/new" aria-label="내 표현 추가" className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-3xl font-black text-white shadow-xl shadow-teal-900/20 transition hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-200">+</Link>
     </div>
   );
 }

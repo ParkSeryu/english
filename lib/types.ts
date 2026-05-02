@@ -50,6 +50,8 @@ export type ExpressionCard = {
   /** Current signed-in user's private memo for this shared expression. */
   user_memo: string | null;
   source_order: number;
+  /** Whether the current signed-in user wants this expression in memorization cards. */
+  is_memorization_enabled?: boolean;
   /** Current signed-in user's private review counters for this shared expression. */
   known_count: number;
   unknown_count: number;
@@ -87,6 +89,7 @@ export type ExpressionProgress = {
   user_id: string;
   expression_id: string;
   user_memo: string | null;
+  is_memorization_enabled: boolean;
   known_count: number;
   unknown_count: number;
   review_count: number;
@@ -154,6 +157,15 @@ export type ExpressionIngestionPayload = {
 
 export type CardMemoInput = {
   userMemo: string;
+  isMemorizationEnabled?: boolean;
+};
+
+export type PersonalExpressionInput = {
+  english: string;
+  koreanPrompt: string;
+  grammarNote?: string | null;
+  userMemo?: string | null;
+  isMemorizationEnabled?: boolean;
 };
 
 export type QuestionNoteInput = {
