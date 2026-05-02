@@ -14,6 +14,7 @@ type ExpressionCardForQueue = {
   due_at: string | null;
   interval_days: number;
   source_order: number;
+  is_memorization_enabled?: boolean;
 };
 
 type SchedulingModule = {
@@ -69,6 +70,22 @@ describe("scheduleMemorizeQueue", () => {
     );
 
     expect(queue.map((candidate) => candidate.id)).toEqual(["never-first", "never-second", "older"]);
+  });
+
+
+  it("excludes cards disabled from the learner's memorize queue", async () => {
+    const { scheduleMemorizeQueue } = await importModule<SchedulingModule>("@/lib/scheduling");
+
+    const queue = scheduleMemorizeQueue(
+      [
+        expression({ id: "enabled", source_order: 0, is_memorization_enabled: true }),
+        expression({ id: "disabled", source_order: 1, is_memorization_enabled: false })
+      ],
+      10,
+      now
+    );
+
+    expect(queue.map((candidate) => candidate.id)).toEqual(["enabled"]);
   });
 
   it("honors the requested queue limit", async () => {

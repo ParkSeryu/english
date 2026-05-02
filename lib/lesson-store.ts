@@ -17,6 +17,7 @@ import type {
   ExpressionExample,
   ExpressionIngestionPayload,
   ExpressionProgress,
+  PersonalExpressionInput,
   IngestionRun,
   QuestionNote,
   QuestionNoteInput,
@@ -49,7 +50,7 @@ type SupabaseExpressionDayRow = Omit<ExpressionDay, "expressions" | "folder" | "
 };
 
 type SupabaseIngestionRunRow = Omit<IngestionRun, "normalized_payload"> & { normalized_payload: unknown };
-type ExpressionStatsCard = Pick<ExpressionCard, "id" | "known_count" | "unknown_count" | "review_count" | "last_result" | "last_reviewed_at" | "due_at" | "interval_days" | "source_order" | "created_at">;
+type ExpressionStatsCard = Pick<ExpressionCard, "id" | "is_memorization_enabled" | "known_count" | "unknown_count" | "review_count" | "last_result" | "last_reviewed_at" | "due_at" | "interval_days" | "source_order" | "created_at">;
 type SupabaseExpressionStatsRow = Pick<ExpressionCard, "id" | "known_count" | "unknown_count" | "review_count" | "last_result" | "last_reviewed_at" | "source_order" | "created_at">;
 type QuestionStats = Pick<QuestionNote, "status">;
 
@@ -75,6 +76,7 @@ export interface ExpressionStore {
   }>;
   recordReviewResult(id: string, result: "known" | "unknown"): Promise<ExpressionCard>;
   updateExpressionMemo(id: string, input: CardMemoInput): Promise<ExpressionCard>;
+  createPersonalExpression(input: PersonalExpressionInput): Promise<ExpressionCard>;
   listQuestionNotes(): Promise<QuestionNote[]>;
   createQuestionNote(input: QuestionNoteInput): Promise<QuestionNote>;
   updateQuestionNote(id: string, input: Partial<QuestionNoteInput> & { status?: QuestionNoteStatus }): Promise<QuestionNote>;
@@ -223,6 +225,7 @@ function defaultProgress(userId: string, expressionId: string, timestamp = nowIs
     user_id: userId,
     expression_id: expressionId,
     user_memo: null,
+    is_memorization_enabled: true,
     known_count: 0,
     unknown_count: 0,
     review_count: 0,
@@ -239,6 +242,7 @@ function applyProgress(card: ExpressionCard, progress?: Partial<ExpressionProgre
   return {
     ...card,
     user_memo: progress?.user_memo ?? null,
+    is_memorization_enabled: progress?.is_memorization_enabled ?? true,
     known_count: progress?.known_count ?? 0,
     unknown_count: progress?.unknown_count ?? 0,
     review_count: progress?.review_count ?? 0,
@@ -252,6 +256,7 @@ function applyProgress(card: ExpressionCard, progress?: Partial<ExpressionProgre
 function expressionStatsWithProgress(row: SupabaseExpressionStatsRow, progress?: Partial<ExpressionProgress> | null): ExpressionStatsCard {
   return {
     id: row.id,
+    is_memorization_enabled: progress?.is_memorization_enabled ?? true,
     known_count: progress?.known_count ?? 0,
     unknown_count: progress?.unknown_count ?? 0,
     review_count: progress?.review_count ?? 0,
@@ -549,6 +554,7 @@ class SupabaseExpressionStore implements ExpressionStore {
           user_id: this.user.id,
           expression_id: id,
           user_memo: current.user_memo ?? null,
+          is_memorization_enabled: current.is_memorization_enabled,
           known_count: result === "known" ? current.known_count + 1 : current.known_count,
           unknown_count: result === "unknown" ? current.unknown_count + 1 : current.unknown_count,
           review_count: current.review_count + 1,
@@ -575,6 +581,7 @@ class SupabaseExpressionStore implements ExpressionStore {
           user_id: this.user.id,
           expression_id: id,
           user_memo: input.userMemo || null,
+          is_memorization_enabled: input.isMemorizationEnabled ?? current.is_memorization_enabled,
           known_count: current.known_count,
           unknown_count: current.unknown_count,
           review_count: current.review_count,
@@ -588,6 +595,72 @@ class SupabaseExpressionStore implements ExpressionStore {
       );
     if (error) raiseStoreError("supabase query", error);
     return requireEntity(await this.getExpression(id), "Expression not found");
+  }
+
+  async createPersonalExpression(input: PersonalExpressionInput) {
+    const supabase = await this.supabase();
+    const timestamp = nowIso();
+    const defaultFolderId = await resolveDefaultWritableFolder(supabase);
+    const title = "내가 추가한 표현";
+    const { data: dayRow, error: dayError } = await supabase
+      .from("expression_days")
+      .insert({
+        owner_id: this.user.id,
+        title,
+        raw_input: input.english,
+        source_note: "직접 추가",
+        day_date: timestamp.slice(0, 10),
+        folder_id: defaultFolderId,
+        created_by: "user",
+        updated_at: timestamp
+      })
+      .select("*")
+      .single();
+    if (dayError) raiseStoreError("supabase query", dayError);
+
+    try {
+      const { data: expressionRow, error: expressionError } = await supabase
+        .from("expressions")
+        .insert({
+          expression_day_id: dayRow.id,
+          owner_id: this.user.id,
+          english: input.english,
+          korean_prompt: input.koreanPrompt,
+          nuance_note: null,
+          structure_note: null,
+          grammar_note: normalizeGrammarNote(input.grammarNote),
+          user_memo: null,
+          source_order: 0,
+          updated_at: timestamp
+        })
+        .select("*")
+        .single();
+      if (expressionError) throw expressionError;
+
+      const { error: progressError } = await supabase.from("expression_progress").upsert(
+        {
+          user_id: this.user.id,
+          expression_id: expressionRow.id,
+          user_memo: input.userMemo || null,
+          is_memorization_enabled: input.isMemorizationEnabled,
+          known_count: 0,
+          unknown_count: 0,
+          review_count: 0,
+          last_result: null,
+          last_reviewed_at: null,
+          due_at: null,
+          interval_days: 0,
+          updated_at: timestamp
+        },
+        { onConflict: "user_id,expression_id" }
+      );
+      if (progressError) throw progressError;
+
+      return requireEntity(await this.getExpression(expressionRow.id as string), "Expression not found");
+    } catch (error) {
+      await supabase.from("expression_days").delete().eq("id", dayRow.id).eq("owner_id", this.user.id);
+      throw error;
+    }
   }
 
   async listQuestionNotes() {
@@ -785,15 +858,19 @@ export class MemoryExpressionStore implements ExpressionStore {
     return applyProgress(card, this.progressForExpression(card.id));
   }
 
+  private canReadDay(day: ExpressionDay) {
+    return day.created_by === "llm" || day.owner_id === this.user.id;
+  }
+
   async listExpressionDays() {
-    return memoryState().expressionDays.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).map((day) => ({
+    return memoryState().expressionDays.filter((day) => this.canReadDay(day)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).map((day) => ({
       ...cloneExpressionDay(day),
       expressions: day.expressions.map((card) => cloneExpression(this.cardWithProgress(card)))
     }));
   }
 
   async getExpressionDay(id: string) {
-    const day = memoryState().expressionDays.find((item) => item.id === id);
+    const day = memoryState().expressionDays.find((item) => item.id === id && this.canReadDay(item));
     return day ? { ...cloneExpressionDay(day), expressions: day.expressions.map((card) => cloneExpression(this.cardWithProgress(card))) } : null;
   }
 
@@ -860,8 +937,58 @@ export class MemoryExpressionStore implements ExpressionStore {
       memoryState().expressionProgress.push(progress);
     }
     progress.user_memo = input.userMemo || null;
+    progress.is_memorization_enabled = input.isMemorizationEnabled ?? progress.is_memorization_enabled;
     progress.updated_at = timestamp;
     return requireEntity(await this.getExpression(id), "Expression not found");
+  }
+
+  async createPersonalExpression(input: PersonalExpressionInput) {
+    const timestamp = nowIso();
+    const expressionId = randomUUID();
+    const expressionDay: ExpressionDay = {
+      id: randomUUID(),
+      owner_id: this.user.id,
+      title: "내가 추가한 표현",
+      raw_input: input.english,
+      source_note: "직접 추가",
+      day_date: timestamp.slice(0, 10),
+      created_by: "user",
+      created_at: timestamp,
+      updated_at: timestamp,
+      expressions: [
+        {
+          id: expressionId,
+          expression_day_id: "",
+          owner_id: this.user.id,
+          english: input.english,
+          korean_prompt: input.koreanPrompt,
+          nuance_note: null,
+          structure_note: null,
+          grammar_note: normalizeGrammarNote(input.grammarNote),
+          user_memo: null,
+          is_memorization_enabled: true,
+          source_order: 0,
+          known_count: 0,
+          unknown_count: 0,
+          review_count: 0,
+          last_result: null,
+          last_reviewed_at: null,
+          due_at: null,
+          interval_days: 0,
+          created_at: timestamp,
+          updated_at: timestamp,
+          examples: []
+        }
+      ]
+    };
+    expressionDay.expressions[0].expression_day_id = expressionDay.id;
+    memoryState().expressionDays.unshift(expressionDay);
+    memoryState().expressionProgress.push({
+      ...defaultProgress(this.user.id, expressionId, timestamp),
+      user_memo: input.userMemo || null,
+      is_memorization_enabled: input.isMemorizationEnabled ?? true
+    });
+    return requireEntity(await this.getExpression(expressionId), "Expression not found");
   }
 
   async listQuestionNotes() {
@@ -951,6 +1078,7 @@ export class MemoryExpressionStore implements ExpressionStore {
         structure_note: null,
         grammar_note: normalizeGrammarNote(cardInput.grammar_note),
         user_memo: null,
+        is_memorization_enabled: true,
         source_order: sourceOrderOffset + index,
         known_count: 0,
         unknown_count: 0,
@@ -992,6 +1120,7 @@ export class MemoryExpressionStore implements ExpressionStore {
 
   private findMutableExpression(id: string) {
     for (const day of memoryState().expressionDays) {
+      if (!this.canReadDay(day)) continue;
       const card = day.expressions.find((candidate) => candidate.id === id);
       if (card) return { day, card };
     }

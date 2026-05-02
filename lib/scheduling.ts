@@ -1,7 +1,7 @@
 import type { ExpressionCard } from "@/lib/types";
 
 type MemorizationCandidate = Pick<ExpressionCard, "id" | "unknown_count" | "known_count" | "last_reviewed_at" | "last_result" | "source_order" | "due_at" | "interval_days"> &
-  Partial<Pick<ExpressionCard, "created_at">>;
+  Partial<Pick<ExpressionCard, "created_at" | "is_memorization_enabled">>;
 
 type ReviewSchedulingState = Pick<MemorizationCandidate, "interval_days" | "last_result" | "last_reviewed_at">;
 
@@ -112,7 +112,11 @@ export function compareExpressionsForMemorization<T extends MemorizationCandidat
 }
 
 export function scheduleMemorizationQueue<T extends MemorizationCandidate>(cards: T[], limit = DEFAULT_LIMIT, now = new Date()) {
-  return [...cards].filter((card) => isExpressionDue(card, now)).sort(compareExpressionsForMemorization).slice(0, limit);
+  return [...cards]
+    .filter((card) => card.is_memorization_enabled !== false)
+    .filter((card) => isExpressionDue(card, now))
+    .sort(compareExpressionsForMemorization)
+    .slice(0, limit);
 }
 
 export const scheduleMemorizeQueue = scheduleMemorizationQueue;

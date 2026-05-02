@@ -71,7 +71,16 @@ export const expressionIngestionPayloadSchema = z.object({
 });
 
 export const cardMemoSchema = z.object({
-  userMemo: z.string().trim().max(2_000, "내 메모는 2,000자 이내로 입력해 주세요")
+  userMemo: z.string().trim().max(2_000, "내 메모는 2,000자 이내로 입력해 주세요"),
+  isMemorizationEnabled: z.boolean().default(false)
+});
+
+export const personalExpressionSchema = z.object({
+  english: nonBlankText.max(500, "영어 표현은 500자 이내로 입력해 주세요"),
+  koreanPrompt: nonBlankText.max(1_000, "한국어 뜻/프롬프트는 1,000자 이내로 입력해 주세요"),
+  grammarNote: optionalText(3_000),
+  userMemo: optionalText(2_000),
+  isMemorizationEnabled: z.boolean().default(false)
 });
 
 export const questionNoteSchema = z.object({
@@ -88,7 +97,20 @@ export function parseExpressionIngestionPayload(input: unknown) {
 }
 
 export function parseCardMemoFormData(formData: FormData) {
-  return cardMemoSchema.safeParse({ userMemo: String(formData.get("userMemo") ?? "").trim() });
+  return cardMemoSchema.safeParse({
+    userMemo: String(formData.get("userMemo") ?? "").trim(),
+    isMemorizationEnabled: formData.get("isMemorizationEnabled") === "on"
+  });
+}
+
+export function parsePersonalExpressionFormData(formData: FormData) {
+  return personalExpressionSchema.safeParse({
+    english: String(formData.get("english") ?? "").trim(),
+    koreanPrompt: String(formData.get("koreanPrompt") ?? "").trim(),
+    grammarNote: String(formData.get("grammarNote") ?? "").trim(),
+    userMemo: String(formData.get("userMemo") ?? "").trim(),
+    isMemorizationEnabled: formData.get("isMemorizationEnabled") === "on"
+  });
 }
 
 export function parseQuestionNoteFormData(formData: FormData) {
