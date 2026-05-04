@@ -102,4 +102,6 @@ for delete
 to authenticated
 using (owner_id = auth.uid() and created_by = 'user');
 
+grant insert, delete on public.expression_days, public.expressions to authenticated;
+
 notify pgrst, 'reload schema';

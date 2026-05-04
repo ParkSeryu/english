@@ -61,6 +61,14 @@ describe("daily expression Supabase RLS migration", () => {
     expect(migration).toContain('drop policy if exists "expression_examples_insert_owned_expression"');
   });
 
+  it("grants authenticated learners the table privileges needed for private expression saves", () => {
+    expect(migration).toContain("grant insert, delete on public.expression_days, public.expressions to authenticated");
+    expect(migration).toContain('create policy "expression_days_insert_private_user"');
+    expect(migration).toContain('create policy "expressions_insert_private_user"');
+    expect(migration).toContain('create policy "expression_days_delete_private_user"');
+    expect(migration).toContain('create policy "expressions_delete_private_user"');
+  });
+
   it("models unauthenticated and cross-owner denial for direct owner tables", () => {
     expect(canOwnerRow("select", null, "user-a")).toBe(false);
     expect(canOwnerRow("insert", "user-a", "user-a", "user-b")).toBe(false);
