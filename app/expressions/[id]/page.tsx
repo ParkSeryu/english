@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ExpressionMemoForm } from "@/components/ExpressionMemoForm";
 import { requireCurrentUser } from "@/lib/auth";
+import { getExpressionDueLabel } from "@/lib/expression-due-label";
 import { getExpressionStore } from "@/lib/lesson-store";
 
 type Params = Promise<{ id: string }>;
@@ -13,6 +14,7 @@ export default async function ExpressionDetailPage({ params }: { params: Params 
   const { id } = await params;
   const expression = await getExpressionStore(user).getExpression(id);
   if (!expression) notFound();
+  const dueLabel = getExpressionDueLabel(expression);
 
   return (
     <div className="space-y-5">
@@ -23,6 +25,7 @@ export default async function ExpressionDetailPage({ params }: { params: Params 
         </div>
         <h1 className="text-3xl font-black text-ink">{expression.english}</h1>
         <p className="text-lg font-semibold leading-7 text-slate-700">{expression.korean_prompt}</p>
+        {dueLabel ? <p className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700">{dueLabel}</p> : null}
       </div>
       <div className="space-y-4">
         {expression.grammar_note ? <InfoBlock title="문법/패턴" body={expression.grammar_note} /> : null}
