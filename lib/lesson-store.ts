@@ -600,29 +600,40 @@ class SupabaseExpressionStore implements ExpressionStore {
   async createPersonalExpression(input: PersonalExpressionInput) {
     const supabase = await this.supabase();
     const timestamp = nowIso();
-    const defaultFolderId = await resolveDefaultWritableFolder(supabase);
-    const title = "내가 추가한 표현";
-    const { data: dayRow, error: dayError } = await supabase
-      .from("expression_days")
-      .insert({
-        owner_id: this.user.id,
-        title,
-        raw_input: input.english,
-        source_note: "직접 추가",
-        day_date: timestamp.slice(0, 10),
-        folder_id: defaultFolderId,
-        created_by: "user",
-        updated_at: timestamp
-      })
-      .select("*")
-      .single();
-    if (dayError) raiseStoreError("supabase query", dayError);
+    let targetDayId = input.targetExpressionDayId ?? null;
+    let createdDayId: string | null = null;
+    let sourceOrder = 0;
+
+    if (targetDayId) {
+      const targetDay = requireEntity(await this.getExpressionDay(targetDayId), "학습 토픽을 찾을 수 없습니다.");
+      sourceOrder = targetDay.expressions.reduce((max, expression) => Math.max(max, expression.source_order), -1) + 1;
+    } else {
+      const defaultFolderId = await resolveDefaultWritableFolder(supabase);
+      const title = "내가 추가한 표현";
+      const { data: dayRow, error: dayError } = await supabase
+        .from("expression_days")
+        .insert({
+          owner_id: this.user.id,
+          title,
+          raw_input: input.english,
+          source_note: "직접 추가",
+          day_date: timestamp.slice(0, 10),
+          folder_id: defaultFolderId,
+          created_by: "user",
+          updated_at: timestamp
+        })
+        .select("*")
+        .single();
+      if (dayError) raiseStoreError("supabase query", dayError);
+      targetDayId = dayRow.id as string;
+      createdDayId = targetDayId;
+    }
 
     try {
       const { data: expressionRow, error: expressionError } = await supabase
         .from("expressions")
         .insert({
-          expression_day_id: dayRow.id,
+          expression_day_id: targetDayId,
           owner_id: this.user.id,
           english: input.english,
           korean_prompt: input.koreanPrompt,
@@ -630,7 +641,7 @@ class SupabaseExpressionStore implements ExpressionStore {
           structure_note: null,
           grammar_note: normalizeGrammarNote(input.grammarNote),
           user_memo: null,
-          source_order: 0,
+          source_order: sourceOrder,
           updated_at: timestamp
         })
         .select("*")
@@ -642,7 +653,7 @@ class SupabaseExpressionStore implements ExpressionStore {
           user_id: this.user.id,
           expression_id: expressionRow.id,
           user_memo: input.userMemo || null,
-          is_memorization_enabled: input.isMemorizationEnabled,
+          is_memorization_enabled: input.isMemorizationEnabled ?? false,
           known_count: 0,
           unknown_count: 0,
           review_count: 0,
@@ -658,7 +669,7 @@ class SupabaseExpressionStore implements ExpressionStore {
 
       return requireEntity(await this.getExpression(expressionRow.id as string), "Expression not found");
     } catch (error) {
-      await supabase.from("expression_days").delete().eq("id", dayRow.id).eq("owner_id", this.user.id);
+      if (createdDayId) await supabase.from("expression_days").delete().eq("id", createdDayId).eq("owner_id", this.user.id);
       throw error;
     }
   }
@@ -862,16 +873,24 @@ export class MemoryExpressionStore implements ExpressionStore {
     return day.created_by === "llm" || day.owner_id === this.user.id;
   }
 
+  private canReadExpression(day: ExpressionDay, card: ExpressionCard) {
+    return card.owner_id === this.user.id || card.owner_id === day.owner_id;
+  }
+
+  private visibleExpressions(day: ExpressionDay) {
+    return day.expressions.filter((card) => this.canReadExpression(day, card));
+  }
+
   async listExpressionDays() {
     return memoryState().expressionDays.filter((day) => this.canReadDay(day)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).map((day) => ({
       ...cloneExpressionDay(day),
-      expressions: day.expressions.map((card) => cloneExpression(this.cardWithProgress(card)))
+      expressions: this.visibleExpressions(day).map((card) => cloneExpression(this.cardWithProgress(card)))
     }));
   }
 
   async getExpressionDay(id: string) {
     const day = memoryState().expressionDays.find((item) => item.id === id && this.canReadDay(item));
-    return day ? { ...cloneExpressionDay(day), expressions: day.expressions.map((card) => cloneExpression(this.cardWithProgress(card))) } : null;
+    return day ? { ...cloneExpressionDay(day), expressions: this.visibleExpressions(day).map((card) => cloneExpression(this.cardWithProgress(card))) } : null;
   }
 
   async getExpression(id: string) {
@@ -945,44 +964,50 @@ export class MemoryExpressionStore implements ExpressionStore {
   async createPersonalExpression(input: PersonalExpressionInput) {
     const timestamp = nowIso();
     const expressionId = randomUUID();
-    const expressionDay: ExpressionDay = {
-      id: randomUUID(),
+    let expressionDay = input.targetExpressionDayId ? memoryState().expressionDays.find((day) => day.id === input.targetExpressionDayId && this.canReadDay(day)) ?? null : null;
+    const sourceOrder = expressionDay ? expressionDay.expressions.reduce((max, expression) => Math.max(max, expression.source_order), -1) + 1 : 0;
+
+    if (!expressionDay) {
+      expressionDay = {
+        id: randomUUID(),
+        owner_id: this.user.id,
+        title: "내가 추가한 표현",
+        raw_input: input.english,
+        source_note: "직접 추가",
+        day_date: timestamp.slice(0, 10),
+        created_by: "user",
+        created_at: timestamp,
+        updated_at: timestamp,
+        expressions: []
+      };
+      memoryState().expressionDays.unshift(expressionDay);
+    }
+
+    const expression: ExpressionCard = {
+      id: expressionId,
+      expression_day_id: expressionDay.id,
       owner_id: this.user.id,
-      title: "내가 추가한 표현",
-      raw_input: input.english,
-      source_note: "직접 추가",
-      day_date: timestamp.slice(0, 10),
-      created_by: "user",
+      english: input.english,
+      korean_prompt: input.koreanPrompt,
+      nuance_note: null,
+      structure_note: null,
+      grammar_note: normalizeGrammarNote(input.grammarNote),
+      user_memo: null,
+      is_memorization_enabled: true,
+      source_order: sourceOrder,
+      known_count: 0,
+      unknown_count: 0,
+      review_count: 0,
+      last_result: null,
+      last_reviewed_at: null,
+      due_at: null,
+      interval_days: 0,
       created_at: timestamp,
       updated_at: timestamp,
-      expressions: [
-        {
-          id: expressionId,
-          expression_day_id: "",
-          owner_id: this.user.id,
-          english: input.english,
-          korean_prompt: input.koreanPrompt,
-          nuance_note: null,
-          structure_note: null,
-          grammar_note: normalizeGrammarNote(input.grammarNote),
-          user_memo: null,
-          is_memorization_enabled: true,
-          source_order: 0,
-          known_count: 0,
-          unknown_count: 0,
-          review_count: 0,
-          last_result: null,
-          last_reviewed_at: null,
-          due_at: null,
-          interval_days: 0,
-          created_at: timestamp,
-          updated_at: timestamp,
-          examples: []
-        }
-      ]
+      examples: []
     };
-    expressionDay.expressions[0].expression_day_id = expressionDay.id;
-    memoryState().expressionDays.unshift(expressionDay);
+    expressionDay.expressions.push(expression);
+    expressionDay.updated_at = timestamp;
     memoryState().expressionProgress.push({
       ...defaultProgress(this.user.id, expressionId, timestamp),
       user_memo: input.userMemo || null,
@@ -1121,7 +1146,7 @@ export class MemoryExpressionStore implements ExpressionStore {
   private findMutableExpression(id: string) {
     for (const day of memoryState().expressionDays) {
       if (!this.canReadDay(day)) continue;
-      const card = day.expressions.find((candidate) => candidate.id === id);
+      const card = day.expressions.find((candidate) => candidate.id === id && this.canReadExpression(day, candidate));
       if (card) return { day, card };
     }
     return null;

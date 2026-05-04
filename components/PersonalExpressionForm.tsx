@@ -8,11 +8,12 @@ import type { ActionState } from "@/lib/types";
 
 const initialState: ActionState = { ok: false };
 
-export function PersonalExpressionForm() {
+export function PersonalExpressionForm({ targetExpressionDayId }: { targetExpressionDayId?: string | null }) {
   const [state, formAction, pending] = useActionState(createPersonalExpressionAction, initialState);
 
   return (
     <form action={formAction} className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+      {targetExpressionDayId ? <input type="hidden" name="targetExpressionDayId" value={targetExpressionDayId} /> : null}
       <div>
         <label className="label" htmlFor="english">영어 표현</label>
         <textarea id="english" name="english" rows={3} className="input min-h-24" placeholder="예: I'm trying to cut down on sugar." required />

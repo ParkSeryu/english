@@ -80,7 +80,8 @@ export const personalExpressionSchema = z.object({
   koreanPrompt: nonBlankText.max(1_000, "한국어 뜻/프롬프트는 1,000자 이내로 입력해 주세요"),
   grammarNote: optionalText(3_000),
   userMemo: optionalText(2_000),
-  isMemorizationEnabled: z.boolean().default(false)
+  isMemorizationEnabled: z.boolean().default(false),
+  targetExpressionDayId: z.string().uuid("학습 토픽 정보가 올바르지 않습니다").optional().nullable()
 });
 
 export const questionNoteSchema = z.object({
@@ -109,7 +110,8 @@ export function parsePersonalExpressionFormData(formData: FormData) {
     koreanPrompt: String(formData.get("koreanPrompt") ?? "").trim(),
     grammarNote: String(formData.get("grammarNote") ?? "").trim(),
     userMemo: String(formData.get("userMemo") ?? "").trim(),
-    isMemorizationEnabled: formData.get("isMemorizationEnabled") === "on"
+    isMemorizationEnabled: formData.get("isMemorizationEnabled") === "on",
+    targetExpressionDayId: String(formData.get("targetExpressionDayId") ?? "").trim() || null
   });
 }
 

@@ -45,7 +45,7 @@ type MemoryExpressionStoreInstance = {
   getMemorizationQueue: (options?: { limit?: number }) => Promise<ExpressionCard[]>;
   recordReviewResult: (id: string, result: ReviewResult) => Promise<ExpressionCard>;
   updateExpressionMemo: (id: string, input: { userMemo: string; isMemorizationEnabled: boolean }) => Promise<ExpressionCard>;
-  createPersonalExpression: (input: { english: string; koreanPrompt: string; grammarNote?: string | null; userMemo?: string | null; isMemorizationEnabled: boolean }) => Promise<ExpressionCard>;
+  createPersonalExpression: (input: { english: string; koreanPrompt: string; grammarNote?: string | null; userMemo?: string | null; isMemorizationEnabled: boolean; targetExpressionDayId?: string | null }) => Promise<ExpressionCard>;
   createQuestionNote: (input: { questionText: string; answerNote?: string; status?: QuestionStatus }) => Promise<QuestionNote>;
   listQuestionNotes: () => Promise<QuestionNote[]>;
   updateQuestionNote: (id: string, input: { questionText?: string; answerNote?: string; status?: QuestionStatus }) => Promise<QuestionNote>;
@@ -204,6 +204,28 @@ describe("MemoryExpressionStore daily expression behavior", () => {
 
     await storeA.updateExpressionMemo(privateExpression.id, { userMemo: "암기에 다시 포함", isMemorizationEnabled: true });
     expect((await storeA.getMemorizationQueue()).map((expression) => expression.id)).toContain(privateExpression.id);
+  });
+
+  it("adds user expressions to the selected expression day when a target day is provided", async () => {
+    const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
+    const topicOwnerStore = new MemoryExpressionStore(userB);
+    const learnerStore = new MemoryExpressionStore(userA);
+    const draft = await topicOwnerStore.createDraft(payload);
+    const approved = await topicOwnerStore.approveDraft(draft.id, "이대로 앱에 넣어줘");
+
+    const addedExpression = await learnerStore.createPersonalExpression({
+      targetExpressionDayId: approved.expressionDay.id,
+      english: "Coffee is not helping.",
+      koreanPrompt: "커피가 도움이 안 돼요.",
+      grammarNote: "help = 도움이 되다",
+      userMemo: "수업 토픽에 추가",
+      isMemorizationEnabled: true
+    });
+
+    const targetDay = await learnerStore.getExpressionDay(approved.expressionDay.id);
+    expect(targetDay?.expressions.map((expression) => expression.id)).toContain(addedExpression.id);
+    expect((await learnerStore.listExpressionDays()).map((day) => day.title)).not.toContain("내가 추가한 표현");
+    expect((await topicOwnerStore.getExpressionDay(approved.expressionDay.id))?.expressions.map((expression) => expression.id)).not.toContain(addedExpression.id);
   });
 
   it("lists open questions before asked and answered questions, and edits received answers", async () => {

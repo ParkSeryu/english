@@ -166,6 +166,7 @@ export type PersonalExpressionInput = {
   grammarNote?: string | null;
   userMemo?: string | null;
   isMemorizationEnabled?: boolean;
+  targetExpressionDayId?: string | null;
 };
 
 export type QuestionNoteInput = {

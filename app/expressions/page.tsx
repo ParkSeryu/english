@@ -75,7 +75,7 @@ export default async function ExpressionsPage({ searchParams }: { searchParams: 
           ))}
         </div>
       )}
-      <Link href="/expressions/new" aria-label="내 표현 추가" className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-3xl font-black text-white shadow-xl shadow-teal-900/20 transition hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-200">+</Link>
+      <Link href={selectedTopicId ? `/expressions/new?topic=${selectedTopicId}` : "/expressions/new"} aria-label="현재 학습 토픽에 표현 추가" className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-3xl font-black text-white shadow-xl shadow-teal-900/20 transition hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-200">+</Link>
     </div>
   );
 }
