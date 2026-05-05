@@ -43,6 +43,12 @@ This repo follows the workspace-level OMX/autonomous-agent instructions. The fol
 - Before reading or writing hosted Supabase data, state which environment is being targeted (`dev` MCP / `.env.local` or `main` / `.env.main.local`) and verify the project ref/host.
 - Do not assume a migration or data fix applied through the dev MCP has also been applied to main/production; apply or verify each environment separately.
 - When promoting code from `dev` to `main`, separately confirm whether any schema/data changes must be applied to the main/production database.
+- Manage schema/data migrations Flyway-style through `supabase/migrations/*.sql` plus the `scripts/db-migrations.mjs` ledger runner, not ad-hoc SQL Editor execution.
+  - Use `npm run db:status:dev` / `npm run db:status:main` to see which migration files are applied, pending, baselined, or checksum-mismatched.
+  - Use `npm run db:baseline:dev` only to record already-applied SQL Editor migrations before the runner takes ownership; do not baseline new migrations instead of applying them.
+  - Use `npm run db:migrate:dev` for dev migration application. For main/production, run status first and require an explicit production confirmation path (`-- --confirm-production`) before applying.
+  - Never edit an already-applied migration file; create a new timestamped migration so the ledger checksum remains meaningful.
+  - If emergency SQL Editor execution is unavoidable, immediately add the matching migration file and baseline the ledger in the same environment before claiming completion.
 - For schema/RLS migrations, verify both databases when relevant:
   - service-role/admin reads can confirm tables, rows, folders, and RPC existence;
   - an authenticated-user read smoke should confirm RLS actually allows `content_folders`, `expression_days`, and `expressions` where applicable;

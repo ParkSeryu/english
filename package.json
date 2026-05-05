@@ -18,7 +18,15 @@
     "verify:rls": "bash scripts/verify-rls-local.sh",
     "clean:runtime": "rm -rf .next test-results playwright-report",
     "verify:all": "npm run verify && npm run test:perf && npm run verify:rls",
-    "sync:main-to-dev": "node scripts/sync-main-to-dev.mjs"
+    "sync:main-to-dev": "node scripts/sync-main-to-dev.mjs",
+    "db:status:dev": "node scripts/db-migrations.mjs status --env dev",
+    "db:migrate:dev": "node scripts/db-migrations.mjs migrate --env dev",
+    "db:baseline:dev": "node scripts/db-migrations.mjs baseline --env dev",
+    "db:validate:dev": "node scripts/db-migrations.mjs validate --env dev",
+    "db:status:main": "node scripts/db-migrations.mjs status --env main",
+    "db:migrate:main": "node scripts/db-migrations.mjs migrate --env main",
+    "db:baseline:main": "node scripts/db-migrations.mjs baseline --env main",
+    "db:validate:main": "node scripts/db-migrations.mjs validate --env main"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
