@@ -868,16 +868,16 @@ class SupabaseExpressionStore implements ExpressionStore {
     if (!expression.can_delete) throw new Error("직접 추가한 표현만 삭제할 수 있습니다.");
 
     const supabase = await this.supabase();
-    await supabase.from("expression_progress").delete().eq("expression_id", id).eq("user_id", this.user.id);
-    let { error } = await supabase.from("expressions").delete().eq("id", id).eq("owner_id", this.user.id);
-    if (error && isPermissionLikeError(error)) {
-      const serviceSupabase = this.serviceSupabaseOrNull();
-      if (serviceSupabase) {
-        await serviceSupabase.from("expression_progress").delete().eq("expression_id", id).eq("user_id", this.user.id);
-        error = (await serviceSupabase.from("expressions").delete().eq("id", id).eq("owner_id", this.user.id)).error;
-      }
-    }
+    const writeSupabase = this.serviceSupabaseOrNull() ?? supabase;
+    const { data: deletedRows, error } = await writeSupabase
+      .from("expressions")
+      .delete()
+      .eq("id", id)
+      .eq("owner_id", this.user.id)
+      .select("id");
     if (error) raiseStoreError("supabase query", error);
+    if ((deletedRows ?? []).length === 0) throw new Error("표현을 삭제하지 못했습니다. 다시 시도해 주세요.");
+    await writeSupabase.from("expression_progress").delete().eq("expression_id", id).eq("user_id", this.user.id);
   }
 
   async listQuestionNotes() {
