@@ -1434,11 +1434,12 @@ function toDaySummary(day: ExpressionDay): ExpressionDaySummary {
 }
 
 function calculateStats(dayCount: number, expressions: ExpressionStatsCard[], questions: QuestionStats[]): DashboardStats {
+  const memorizationExpressions = expressions.filter((card) => card.is_memorization_enabled !== false);
   return {
-    total: expressions.length,
-    knownReviews: expressions.reduce((sum, card) => sum + card.known_count, 0),
-    unknownReviews: expressions.reduce((sum, card) => sum + card.unknown_count, 0),
-    unseenCount: expressions.filter((card) => !card.last_reviewed_at).length,
+    total: memorizationExpressions.length,
+    knownReviews: memorizationExpressions.reduce((sum, card) => sum + card.known_count, 0),
+    unknownReviews: memorizationExpressions.reduce((sum, card) => sum + card.unknown_count, 0),
+    unseenCount: memorizationExpressions.filter((card) => !card.last_reviewed_at).length,
     dueCount: scheduleMemorizationQueue(expressions, 300).length,
     dayCount,
     questionCount: questions.length,

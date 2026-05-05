@@ -25,7 +25,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <section className="rounded-[2rem] bg-ink p-6 text-white shadow-card">
         <p className="inline-flex rounded-full bg-white/10 px-3 py-1 text-sm font-extrabold text-teal-100">오늘의 학습</p>
-        <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.03em]">배운 표현,<br />바로 외우기</h1>
+        <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.03em]">배운 암기,<br />바로 외우기</h1>
         <Link href="/memorize" className="mt-6 flex min-h-14 items-center justify-center rounded-full bg-teal-500 px-5 py-3 text-base font-black text-white shadow-lg shadow-teal-950/30 transition hover:bg-teal-400">학습 시작</Link>
         <Suspense fallback={<StatsGridSkeleton />}>
           <DashboardStatsGrid user={user} />
@@ -44,8 +44,8 @@ function PublicDashboard() {
     <div className="space-y-6">
       <section className="rounded-[2rem] bg-ink p-6 text-white shadow-card">
         <p className="inline-flex rounded-full bg-white/10 px-3 py-1 text-sm font-extrabold text-teal-100">오늘의 학습</p>
-        <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.03em]">배운 표현,<br />바로 외우기</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-200">오늘 배운 영어 표현을 가볍게 저장하고 다시 떠올려 보세요.</p>
+        <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.03em]">배운 암기,<br />바로 외우기</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-200">오늘 배운 영어 암기를 가볍게 저장하고 다시 떠올려 보세요.</p>
         <Link href="/login" className="mt-6 inline-flex rounded-full bg-white px-5 py-3 font-black text-ink shadow-lg shadow-black/10">시작하기</Link>
       </section>
       {!hasSupabaseEnv() ? <EnvWarning /> : null}
@@ -58,7 +58,7 @@ async function DashboardStatsGrid({ user }: { user: UserIdentity }) {
 
   return (
     <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <StatCard label="표현" value={stats.total} />
+      <StatCard label="암기" value={stats.total} />
       <StatCard label="미확인" value={stats.unseenCount} />
       <StatCard label="오늘 복습" value={stats.dueCount} />
       <StatCard label="질문" value={stats.openQuestionCount} />
@@ -72,10 +72,10 @@ async function DashboardSections({ user }: { user: UserIdentity }) {
   return (
     <>
       {stats.total === 0 ? (
-        <EmptyState title="아직 저장된 표현이 없습니다" body="배운 표현이 생기면 여기에서 바로 복습을 시작할 수 있습니다." actionHref="/expressions" actionLabel="표현 모아보기" />
+        <EmptyState title="아직 저장된 표현이 없습니다" body="배운 표현이 생기면 여기에서 바로 복습을 시작할 수 있습니다." actionHref="/expressions" actionLabel="암기 목록" />
       ) : (
         <div className="hidden gap-3 sm:grid sm:grid-cols-2">
-          <Link href="/expressions" className="btn-secondary flex min-h-16">표현 모아보기</Link>
+          <Link href="/expressions" className="btn-secondary flex min-h-16">암기 목록</Link>
           <Link href="/questions" className="btn-ghost flex min-h-16 items-center justify-center">질문거리</Link>
         </div>
       )}

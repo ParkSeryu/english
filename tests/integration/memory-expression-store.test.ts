@@ -45,6 +45,7 @@ type MemoryExpressionStoreInstance = {
   listExpressionDays: () => Promise<ExpressionDay[]>;
   getExpressionDay: (id: string) => Promise<ExpressionDay | null>;
   getExpression: (id: string) => Promise<ExpressionCard | null>;
+  getDashboardStats: () => Promise<{ total: number }>;
   getMemorizationQueue: (options?: { limit?: number }) => Promise<ExpressionCard[]>;
   recordReviewResult: (id: string, result: ReviewResult) => Promise<ExpressionCard>;
   updateExpressionMemo: (id: string, input: { userMemo: string; isMemorizationEnabled: boolean }) => Promise<ExpressionCard>;
@@ -209,9 +210,11 @@ describe("MemoryExpressionStore daily expression behavior", () => {
     expect(await storeB.getExpression(privateExpression.id)).toBeNull();
     expect((await storeB.listExpressionDays()).flatMap((day) => day.expressions).map((expression) => expression.id)).not.toContain(privateExpression.id);
     expect((await storeA.getMemorizationQueue()).map((expression) => expression.id)).not.toContain(privateExpression.id);
+    expect(await storeA.getDashboardStats()).toMatchObject({ total: approved.expressionDay.expressions.length });
 
     await storeA.updateExpressionMemo(privateExpression.id, { userMemo: "암기에 다시 포함", isMemorizationEnabled: true });
     expect((await storeA.getMemorizationQueue()).map((expression) => expression.id)).toContain(privateExpression.id);
+    expect(await storeA.getDashboardStats()).toMatchObject({ total: approved.expressionDay.expressions.length + 1 });
   });
 
   it("rejects personal expression creation without a selected expression day", async () => {
