@@ -20,7 +20,13 @@ export default async function NewExpressionPage({ searchParams }: { searchParams
         <h1 className="text-3xl font-black text-ink">현재 학습 토픽에 표현 추가</h1>
         <p className="text-sm leading-6 text-slate-600">플로팅 버튼을 누른 학습 토픽 안에 내 계정에만 보이는 표현을 추가합니다.</p>
       </div>
-      <PersonalExpressionForm targetExpressionDayId={targetExpressionDayId} />
+      {targetExpressionDayId ? (
+        <PersonalExpressionForm targetExpressionDayId={targetExpressionDayId} />
+      ) : (
+        <div className="rounded-[28px] border-2 border-dashed border-amber-200 bg-amber-50 p-5 text-sm font-semibold leading-6 text-amber-900">
+          표현 목록이나 상세 화면에서 플로팅 + 버튼을 눌러 현재 학습 토픽을 선택한 뒤 추가해 주세요.
+        </div>
+      )}
     </div>
   );
 }

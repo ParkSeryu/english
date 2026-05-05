@@ -612,78 +612,50 @@ class SupabaseExpressionStore implements ExpressionStore {
   async createPersonalExpression(input: PersonalExpressionInput) {
     const supabase = await this.supabase();
     const timestamp = nowIso();
-    let targetDayId = input.targetExpressionDayId ?? null;
-    let createdDayId: string | null = null;
-    let sourceOrder = 0;
+    const targetDayId = input.targetExpressionDayId ?? null;
+    if (!targetDayId) throw new Error("학습 토픽을 선택해 주세요.");
 
-    if (targetDayId) {
-      const targetDay = requireEntity(await this.getExpressionDay(targetDayId), "학습 토픽을 찾을 수 없습니다.");
-      sourceOrder = targetDay.expressions.reduce((max, expression) => Math.max(max, expression.source_order), -1) + 1;
-    } else {
-      const defaultFolderId = await resolveDefaultWritableFolder(supabase);
-      const title = "내가 추가한 표현";
-      const { data: dayRow, error: dayError } = await supabase
-        .from("expression_days")
-        .insert({
-          owner_id: this.user.id,
-          title,
-          raw_input: input.english,
-          source_note: "직접 추가",
-          day_date: timestamp.slice(0, 10),
-          folder_id: defaultFolderId,
-          created_by: "user",
-          updated_at: timestamp
-        })
-        .select("*")
-        .single();
-      if (dayError) raiseStoreError("supabase query", dayError);
-      targetDayId = dayRow.id as string;
-      createdDayId = targetDayId;
-    }
+    const targetDay = requireEntity(await this.getExpressionDay(targetDayId), "학습 토픽을 찾을 수 없습니다.");
+    const sourceOrder = targetDay.expressions.reduce((max, expression) => Math.max(max, expression.source_order), -1) + 1;
 
-    try {
-      const { data: expressionRow, error: expressionError } = await supabase
-        .from("expressions")
-        .insert({
-          expression_day_id: targetDayId,
-          owner_id: this.user.id,
-          english: input.english,
-          korean_prompt: input.koreanPrompt,
-          nuance_note: null,
-          structure_note: null,
-          grammar_note: normalizeGrammarNote(input.grammarNote),
-          user_memo: null,
-          source_order: sourceOrder,
-          updated_at: timestamp
-        })
-        .select("*")
-        .single();
-      if (expressionError) throw expressionError;
+    const { data: expressionRow, error: expressionError } = await supabase
+      .from("expressions")
+      .insert({
+        expression_day_id: targetDayId,
+        owner_id: this.user.id,
+        english: input.english,
+        korean_prompt: input.koreanPrompt,
+        nuance_note: null,
+        structure_note: null,
+        grammar_note: normalizeGrammarNote(input.grammarNote),
+        user_memo: null,
+        source_order: sourceOrder,
+        updated_at: timestamp
+      })
+      .select("*")
+      .single();
+    if (expressionError) throw expressionError;
 
-      const { error: progressError } = await supabase.from("expression_progress").upsert(
-        {
-          user_id: this.user.id,
-          expression_id: expressionRow.id,
-          user_memo: input.userMemo || null,
-          is_memorization_enabled: input.isMemorizationEnabled ?? false,
-          known_count: 0,
-          unknown_count: 0,
-          review_count: 0,
-          last_result: null,
-          last_reviewed_at: null,
-          due_at: null,
-          interval_days: 0,
-          updated_at: timestamp
-        },
-        { onConflict: "user_id,expression_id" }
-      );
-      if (progressError) throw progressError;
+    const { error: progressError } = await supabase.from("expression_progress").upsert(
+      {
+        user_id: this.user.id,
+        expression_id: expressionRow.id,
+        user_memo: input.userMemo || null,
+        is_memorization_enabled: input.isMemorizationEnabled ?? false,
+        known_count: 0,
+        unknown_count: 0,
+        review_count: 0,
+        last_result: null,
+        last_reviewed_at: null,
+        due_at: null,
+        interval_days: 0,
+        updated_at: timestamp
+      },
+      { onConflict: "user_id,expression_id" }
+    );
+    if (progressError) throw progressError;
 
-      return requireEntity(await this.getExpression(expressionRow.id as string), "Expression not found");
-    } catch (error) {
-      if (createdDayId) await supabase.from("expression_days").delete().eq("id", createdDayId).eq("owner_id", this.user.id);
-      throw error;
-    }
+    return requireEntity(await this.getExpression(expressionRow.id as string), "Expression not found");
   }
 
   async deletePersonalExpression(id: string) {
@@ -991,24 +963,10 @@ export class MemoryExpressionStore implements ExpressionStore {
   async createPersonalExpression(input: PersonalExpressionInput) {
     const timestamp = nowIso();
     const expressionId = randomUUID();
-    let expressionDay = input.targetExpressionDayId ? memoryState().expressionDays.find((day) => day.id === input.targetExpressionDayId && this.canReadDay(day)) ?? null : null;
-    const sourceOrder = expressionDay ? expressionDay.expressions.reduce((max, expression) => Math.max(max, expression.source_order), -1) + 1 : 0;
-
-    if (!expressionDay) {
-      expressionDay = {
-        id: randomUUID(),
-        owner_id: this.user.id,
-        title: "내가 추가한 표현",
-        raw_input: input.english,
-        source_note: "직접 추가",
-        day_date: timestamp.slice(0, 10),
-        created_by: "user",
-        created_at: timestamp,
-        updated_at: timestamp,
-        expressions: []
-      };
-      memoryState().expressionDays.unshift(expressionDay);
-    }
+    if (!input.targetExpressionDayId) throw new Error("학습 토픽을 선택해 주세요.");
+    const expressionDay = memoryState().expressionDays.find((day) => day.id === input.targetExpressionDayId && this.canReadDay(day)) ?? null;
+    if (!expressionDay) throw new Error("학습 토픽을 찾을 수 없습니다.");
+    const sourceOrder = expressionDay.expressions.reduce((max, expression) => Math.max(max, expression.source_order), -1) + 1;
 
     const expression: ExpressionCard = {
       id: expressionId,
