@@ -63,6 +63,7 @@ const EXPRESSION_DAY_WITH_CARDS_SELECT = `${EXPRESSION_DAY_COLUMNS},expressions(
 const LEGACY_EXPRESSION_DAY_WITH_CARDS_SELECT = `${LEGACY_EXPRESSION_DAY_COLUMNS},expressions(id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at))`;
 const EXPRESSION_WITH_DAY_SELECT = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,owner_id,title,source_note,day_date,created_by,folder_id)";
 const LEGACY_EXPRESSION_WITH_DAY_SELECT = "id, expression_day_id, owner_id, english, korean_prompt, nuance_note, structure_note, grammar_note, user_memo, source_order, known_count, unknown_count, review_count, last_result, last_reviewed_at, created_at, updated_at, expression_examples(id, expression_id, example_text, meaning_ko, source, sort_order, created_at), expression_days(id,owner_id,title,source_note,day_date,created_by)";
+const PERSONAL_EXPRESSION_MARKER = "__personal_expression__";
 
 export interface ExpressionStore {
   listExpressionDays(): Promise<ExpressionDay[]>;
@@ -478,7 +479,7 @@ class SupabaseExpressionStore implements ExpressionStore {
   }
 
   private canDeleteExpression(card: ExpressionCard, day?: Pick<ExpressionDay | ExpressionDaySummary, "owner_id" | "created_by"> | null) {
-    return card.owner_id === this.user.id && (day?.created_by === "user" || card.owner_id !== day?.owner_id);
+    return card.owner_id === this.user.id && (card.user_memo === PERSONAL_EXPRESSION_MARKER || day?.created_by === "user" || card.owner_id !== day?.owner_id);
   }
 
   private withDeletePermission(card: ExpressionCard, day: ExpressionDay | ExpressionDaySummary | null | undefined = card.day) {
@@ -802,7 +803,7 @@ class SupabaseExpressionStore implements ExpressionStore {
       nuance_note: null,
       structure_note: null,
       grammar_note: grammarNote,
-      user_memo: null,
+      user_memo: PERSONAL_EXPRESSION_MARKER,
       source_order: sourceOrder,
       updated_at: timestamp
     };
@@ -814,6 +815,7 @@ class SupabaseExpressionStore implements ExpressionStore {
       .select("*")
       .eq("expression_day_id", targetDayId)
       .eq("owner_id", this.user.id)
+      .eq("user_memo", PERSONAL_EXPRESSION_MARKER)
       .eq("english", input.english)
       .eq("korean_prompt", input.koreanPrompt)
       .order("created_at", { ascending: false })
@@ -1082,7 +1084,7 @@ export class MemoryExpressionStore implements ExpressionStore {
   }
 
   private canDeleteExpression(day: ExpressionDay | undefined, card: ExpressionCard) {
-    return card.owner_id === this.user.id && (day?.created_by === "user" || card.owner_id !== day?.owner_id);
+    return card.owner_id === this.user.id && (card.user_memo === PERSONAL_EXPRESSION_MARKER || day?.created_by === "user" || card.owner_id !== day?.owner_id);
   }
 
   private visibleExpressions(day: ExpressionDay) {
@@ -1186,7 +1188,7 @@ export class MemoryExpressionStore implements ExpressionStore {
       nuance_note: null,
       structure_note: null,
       grammar_note: normalizeGrammarNote(input.grammarNote),
-      user_memo: null,
+      user_memo: PERSONAL_EXPRESSION_MARKER,
       is_memorization_enabled: true,
       source_order: sourceOrder,
       known_count: 0,
