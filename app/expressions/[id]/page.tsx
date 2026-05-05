@@ -32,18 +32,17 @@ export default async function ExpressionDetailPage({ params }: { params: Params 
         {expression.grammar_note ? <InfoBlock title="문법/패턴" body={expression.grammar_note} /> : null}
         {expression.examples.length > 0 ? <section className="rounded-3xl bg-white p-5 shadow-card"><h2 className="text-sm font-black uppercase tracking-wide text-slate-500">비슷한 표현</h2><ul className="mt-3 space-y-3">{expression.examples.map((example) => <li key={example.id} className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold text-ink">{example.example_text}</p>{example.meaning_ko ? <p className="mt-1 text-sm text-slate-600">{example.meaning_ko}</p> : null}</li>)}</ul></section> : null}
       </div>
-      <ExpressionMemoForm expression={expression} />
       {expression.can_delete ? (
-        <Link href={`/expressions/${expression.id}/edit`} className="btn-secondary flex min-h-12">수정하기</Link>
-      ) : null}
-      {expression.can_delete ? (
-        <form action={deletePersonalExpressionAction.bind(null, expression.id)} className="rounded-3xl border border-red-100 bg-red-50 p-5">
-          <p className="text-sm font-semibold leading-6 text-red-800">내가 직접 추가한 표현입니다. 더 이상 필요 없으면 삭제할 수 있어요.</p>
-          <button type="submit" className="mt-3 w-full rounded-2xl bg-red-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-200">
-            이 표현 삭제
-          </button>
-        </form>
-      ) : null}
+        <div className="flex items-center gap-2 text-xs font-black">
+          <Link href={`/expressions/${expression.id}/edit`} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-600 shadow-sm transition hover:border-teal-300 hover:text-teal-700">수정</Link>
+          <span className="text-slate-300">/</span>
+          <form action={deletePersonalExpressionAction.bind(null, expression.id)}>
+            <button type="submit" className="rounded-full border border-red-100 bg-white px-3 py-1.5 text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-50">삭제</button>
+          </form>
+        </div>
+      ) : (
+        <ExpressionMemoForm expression={expression} />
+      )}
       <Link href={expression.day ? `/expressions/new?topic=${expression.day.id}` : "/expressions/new"} aria-label="현재 학습 토픽에 표현 추가" className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-3xl font-black text-white shadow-xl shadow-teal-900/20 transition hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-200">+</Link>
     </div>
   );
