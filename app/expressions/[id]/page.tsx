@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { deletePersonalExpressionAction } from "@/app/actions";
+import { DeletePersonalExpressionForm } from "@/components/DeletePersonalExpressionForm";
 import { ExpressionMemoForm } from "@/components/ExpressionMemoForm";
 import { requireCurrentUser } from "@/lib/auth";
 import { getExpressionDueLabel } from "@/lib/expression-due-label";
@@ -36,9 +36,7 @@ export default async function ExpressionDetailPage({ params }: { params: Params 
         <div className="flex items-center gap-2 text-xs font-black">
           <Link href={`/expressions/${expression.id}/edit`} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-600 shadow-sm transition hover:border-teal-300 hover:text-teal-700">수정</Link>
           <span className="text-slate-300">/</span>
-          <form action={deletePersonalExpressionAction.bind(null, expression.id)}>
-            <button type="submit" className="rounded-full border border-red-100 bg-white px-3 py-1.5 text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-50">삭제</button>
-          </form>
+          <DeletePersonalExpressionForm expressionId={expression.id} />
         </div>
       ) : (
         <ExpressionMemoForm expression={expression} />
