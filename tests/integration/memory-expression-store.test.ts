@@ -183,10 +183,13 @@ describe("MemoryExpressionStore daily expression behavior", () => {
 
   it("keeps user-added expressions private and honors per-user memorize inclusion", async () => {
     const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
+    const topicOwnerStore = new MemoryExpressionStore(userB);
     const storeA = new MemoryExpressionStore(userA);
     const storeB = new MemoryExpressionStore(userB);
+    const approved = await topicOwnerStore.approveDraft((await topicOwnerStore.createDraft(payload)).id, "이대로 앱에 넣어줘");
 
     const privateExpression = await storeA.createPersonalExpression({
+      targetExpressionDayId: approved.expressionDay.id,
       english: "I need to sleep on it.",
       koreanPrompt: "좀 더 생각해 봐야겠어요.",
       grammarNote: "sleep on it = 하룻밤 생각해보다",
@@ -206,6 +209,20 @@ describe("MemoryExpressionStore daily expression behavior", () => {
 
     await storeA.updateExpressionMemo(privateExpression.id, { userMemo: "암기에 다시 포함", isMemorizationEnabled: true });
     expect((await storeA.getMemorizationQueue()).map((expression) => expression.id)).toContain(privateExpression.id);
+  });
+
+  it("rejects personal expression creation without a selected expression day", async () => {
+    const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
+    const storeA = new MemoryExpressionStore(userA);
+
+    await expect(
+      storeA.createPersonalExpression({
+        english: "I need to sleep on it.",
+        koreanPrompt: "좀 더 생각해 봐야겠어요.",
+        isMemorizationEnabled: true
+      })
+    ).rejects.toThrow("학습 토픽을 선택해 주세요");
+    expect((await storeA.listExpressionDays()).map((day) => day.title)).not.toContain("내가 추가한 표현");
   });
 
   it("adds user expressions to the selected expression day when a target day is provided", async () => {
