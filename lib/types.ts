@@ -173,6 +173,8 @@ export type PersonalExpressionInput = {
   targetExpressionDayId?: string | null;
 };
 
+export type PersonalExpressionUpdateInput = Omit<PersonalExpressionInput, "targetExpressionDayId">;
+
 export type QuestionNoteInput = {
   questionText: string;
   answerNote?: string | null;

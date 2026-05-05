@@ -34,6 +34,9 @@ export default async function ExpressionDetailPage({ params }: { params: Params 
       </div>
       <ExpressionMemoForm expression={expression} />
       {expression.can_delete ? (
+        <Link href={`/expressions/${expression.id}/edit`} className="btn-secondary flex min-h-12">수정하기</Link>
+      ) : null}
+      {expression.can_delete ? (
         <form action={deletePersonalExpressionAction.bind(null, expression.id)} className="rounded-3xl border border-red-100 bg-red-50 p-5">
           <p className="text-sm font-semibold leading-6 text-red-800">내가 직접 추가한 표현입니다. 더 이상 필요 없으면 삭제할 수 있어요.</p>
           <button type="submit" className="mt-3 w-full rounded-2xl bg-red-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-200">

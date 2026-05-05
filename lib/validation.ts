@@ -84,6 +84,8 @@ export const personalExpressionSchema = z.object({
   targetExpressionDayId: z.string().uuid("학습 토픽 정보가 올바르지 않습니다").optional().nullable()
 });
 
+export const personalExpressionUpdateSchema = personalExpressionSchema.omit({ targetExpressionDayId: true });
+
 export const questionNoteSchema = z.object({
   questionText: nonBlankText.max(1_000, "질문은 1,000자 이내로 입력해 주세요"),
   answerNote: z.string().trim().max(3_000, "답변 메모는 3,000자 이내로 입력해 주세요").optional().default("")
@@ -112,6 +114,16 @@ export function parsePersonalExpressionFormData(formData: FormData) {
     userMemo: String(formData.get("userMemo") ?? "").trim(),
     isMemorizationEnabled: formData.get("isMemorizationEnabled") === "on",
     targetExpressionDayId: String(formData.get("targetExpressionDayId") ?? "").trim() || null
+  });
+}
+
+export function parsePersonalExpressionUpdateFormData(formData: FormData) {
+  return personalExpressionUpdateSchema.safeParse({
+    english: String(formData.get("english") ?? "").trim(),
+    koreanPrompt: String(formData.get("koreanPrompt") ?? "").trim(),
+    grammarNote: String(formData.get("grammarNote") ?? "").trim(),
+    userMemo: String(formData.get("userMemo") ?? "").trim(),
+    isMemorizationEnabled: formData.get("isMemorizationEnabled") === "on"
   });
 }
 

@@ -19,6 +19,8 @@ type ExpressionCard = {
   korean_prompt: string;
   nuance_note: string | null;
   structure_note: string | null;
+  grammar_note: string | null;
+  user_memo: string | null;
   unknown_count: number;
   known_count: number;
   review_count: number;
@@ -47,6 +49,7 @@ type MemoryExpressionStoreInstance = {
   recordReviewResult: (id: string, result: ReviewResult) => Promise<ExpressionCard>;
   updateExpressionMemo: (id: string, input: { userMemo: string; isMemorizationEnabled: boolean }) => Promise<ExpressionCard>;
   createPersonalExpression: (input: { english: string; koreanPrompt: string; grammarNote?: string | null; userMemo?: string | null; isMemorizationEnabled: boolean; targetExpressionDayId?: string | null }) => Promise<ExpressionCard>;
+  updatePersonalExpression: (id: string, input: { english: string; koreanPrompt: string; grammarNote?: string | null; userMemo?: string | null; isMemorizationEnabled: boolean }) => Promise<ExpressionCard>;
   deletePersonalExpression: (id: string) => Promise<void>;
   createQuestionNote: (input: { questionText: string; answerNote?: string; status?: QuestionStatus }) => Promise<QuestionNote>;
   listQuestionNotes: () => Promise<QuestionNote[]>;
@@ -245,6 +248,45 @@ describe("MemoryExpressionStore daily expression behavior", () => {
     expect(targetDay?.expressions.map((expression) => expression.id)).toContain(addedExpression.id);
     expect((await learnerStore.listExpressionDays()).map((day) => day.title)).not.toContain("내가 추가한 표현");
     expect((await topicOwnerStore.getExpressionDay(approved.expressionDay.id))?.expressions.map((expression) => expression.id)).not.toContain(addedExpression.id);
+  });
+
+  it("updates only directly added expressions including memorize inclusion", async () => {
+    const { MemoryExpressionStore } = await importModule<StoreModule>("@/lib/expression-store");
+    const topicOwnerStore = new MemoryExpressionStore(userB);
+    const learnerStore = new MemoryExpressionStore(userA);
+    const approved = await topicOwnerStore.approveDraft((await topicOwnerStore.createDraft(payload)).id, "이대로 앱에 넣어줘");
+    const sharedExpressionId = approved.expressionDay.expressions[0].id;
+    const addedExpression = await learnerStore.createPersonalExpression({
+      targetExpressionDayId: approved.expressionDay.id,
+      english: "Coffee is not helping.",
+      koreanPrompt: "커피가 도움이 안 돼요.",
+      grammarNote: "help = 도움이 되다",
+      userMemo: "수업 토픽에 추가",
+      isMemorizationEnabled: true
+    });
+
+    const updated = await learnerStore.updatePersonalExpression(addedExpression.id, {
+      english: "Coffee still is not helping.",
+      koreanPrompt: "커피가 여전히 도움이 안 돼요.",
+      grammarNote: "still = 여전히",
+      userMemo: "내가 고친 표현",
+      isMemorizationEnabled: false
+    });
+
+    expect(updated).toMatchObject({
+      english: "Coffee still is not helping.",
+      korean_prompt: "커피가 여전히 도움이 안 돼요.",
+      grammar_note: "still = 여전히",
+      user_memo: "내가 고친 표현",
+      is_memorization_enabled: false,
+      can_delete: true
+    });
+    expect((await learnerStore.getMemorizationQueue()).map((expression) => expression.id)).not.toContain(addedExpression.id);
+    await expect(learnerStore.updatePersonalExpression(sharedExpressionId, {
+      english: "Nope",
+      koreanPrompt: "안 됨",
+      isMemorizationEnabled: true
+    })).rejects.toThrow("직접 추가한 표현만 수정할 수 있습니다");
   });
 
   it("deletes only expressions created by the current user", async () => {

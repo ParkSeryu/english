@@ -19,6 +19,7 @@ import type {
   ExpressionIngestionPayload,
   ExpressionProgress,
   PersonalExpressionInput,
+  PersonalExpressionUpdateInput,
   IngestionRun,
   QuestionNote,
   QuestionNoteInput,
@@ -79,6 +80,7 @@ export interface ExpressionStore {
   recordReviewResult(id: string, result: "known" | "unknown"): Promise<ExpressionCard>;
   updateExpressionMemo(id: string, input: CardMemoInput): Promise<ExpressionCard>;
   createPersonalExpression(input: PersonalExpressionInput): Promise<ExpressionCard>;
+  updatePersonalExpression(id: string, input: PersonalExpressionUpdateInput): Promise<ExpressionCard>;
   deletePersonalExpression(id: string): Promise<void>;
   listQuestionNotes(): Promise<QuestionNote[]>;
   createQuestionNote(input: QuestionNoteInput): Promise<QuestionNote>;
@@ -862,6 +864,48 @@ class SupabaseExpressionStore implements ExpressionStore {
     return requireEntity(await this.getExpression(expressionRow.id as string), "Expression not found");
   }
 
+  async updatePersonalExpression(id: string, input: PersonalExpressionUpdateInput) {
+    const existing = requireEntity(await this.getExpression(id), "Expression not found");
+    if (!existing.can_delete) throw new Error("직접 추가한 표현만 수정할 수 있습니다.");
+
+    const supabase = await this.supabase();
+    const writeSupabase = this.serviceSupabaseOrNull() ?? supabase;
+    const timestamp = nowIso();
+    const { data: updatedRows, error } = await writeSupabase
+      .from("expressions")
+      .update({
+        english: input.english,
+        korean_prompt: input.koreanPrompt,
+        grammar_note: normalizeGrammarNote(input.grammarNote),
+        user_memo: PERSONAL_EXPRESSION_MARKER,
+        updated_at: timestamp
+      })
+      .eq("id", id)
+      .eq("owner_id", this.user.id)
+      .select("id");
+    if (error) raiseStoreError("supabase query", error);
+    if ((updatedRows ?? []).length === 0) throw new Error("표현을 수정하지 못했습니다. 다시 시도해 주세요.");
+
+    const current = (await this.progressForOne(id, writeSupabase)) ?? defaultProgress(this.user.id, id, existing.created_at);
+    const { error: progressError } = await this.upsertProgressWithFallback({
+      user_id: this.user.id,
+      expression_id: id,
+      user_memo: input.userMemo || null,
+      is_memorization_enabled: input.isMemorizationEnabled ?? current.is_memorization_enabled,
+      known_count: current.known_count,
+      unknown_count: current.unknown_count,
+      review_count: current.review_count,
+      last_result: current.last_result,
+      last_reviewed_at: current.last_reviewed_at,
+      due_at: current.due_at,
+      interval_days: current.interval_days,
+      updated_at: timestamp
+    }, writeSupabase);
+    if (progressError) raiseStoreError("supabase query", progressError);
+
+    return requireEntity(await this.getExpression(id), "Expression not found");
+  }
+
   async deletePersonalExpression(id: string) {
     const expression = await this.getExpression(id);
     if (!expression) throw new Error("Expression not found");
@@ -1210,6 +1254,31 @@ export class MemoryExpressionStore implements ExpressionStore {
       is_memorization_enabled: input.isMemorizationEnabled ?? true
     });
     return requireEntity(await this.getExpression(expressionId), "Expression not found");
+  }
+
+  async updatePersonalExpression(id: string, input: PersonalExpressionUpdateInput) {
+    const located = this.findMutableExpression(id);
+    if (!located) throw new Error("Expression not found");
+    if (!this.canDeleteExpression(located.day, located.card)) throw new Error("직접 추가한 표현만 수정할 수 있습니다.");
+
+    const timestamp = nowIso();
+    located.card.english = input.english;
+    located.card.korean_prompt = input.koreanPrompt;
+    located.card.grammar_note = normalizeGrammarNote(input.grammarNote);
+    located.card.user_memo = PERSONAL_EXPRESSION_MARKER;
+    located.card.updated_at = timestamp;
+    located.day.updated_at = timestamp;
+
+    let progress = this.progressForExpression(id);
+    if (!progress) {
+      progress = defaultProgress(this.user.id, id, located.card.created_at);
+      memoryState().expressionProgress.push(progress);
+    }
+    progress.user_memo = input.userMemo || null;
+    progress.is_memorization_enabled = input.isMemorizationEnabled ?? progress.is_memorization_enabled;
+    progress.updated_at = timestamp;
+
+    return requireEntity(await this.getExpression(id), "Expression not found");
   }
 
   async deletePersonalExpression(id: string) {

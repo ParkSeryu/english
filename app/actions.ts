@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth";
-import { flattenZodErrors, parseCardMemoFormData, parsePersonalExpressionFormData, parseQuestionNoteFormData, parseQuestionNoteUpdateFormData } from "@/lib/validation";
+import { flattenZodErrors, parseCardMemoFormData, parsePersonalExpressionFormData, parsePersonalExpressionUpdateFormData, parseQuestionNoteFormData, parseQuestionNoteUpdateFormData } from "@/lib/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getExpressionStore } from "@/lib/lesson-store";
 import { passwordResetRedirectUrl } from "@/lib/site-url";
@@ -47,6 +47,22 @@ export async function createPersonalExpressionAction(_previousState: ActionState
     const expression = await getExpressionStore(user).createPersonalExpression(parsed.data);
     expressionId = expression.id;
     revalidateAppPaths();
+  } catch (error) {
+    return errorState(error);
+  }
+
+  redirect(`/expressions/${expressionId}`);
+}
+
+export async function updatePersonalExpressionAction(expressionId: string, _previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parsePersonalExpressionUpdateFormData(formData);
+  if (!parsed.success) return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "표현 내용을 확인해 주세요." };
+
+  try {
+    const user = await requireCurrentUser();
+    await getExpressionStore(user).updatePersonalExpression(expressionId, parsed.data);
+    revalidateAppPaths();
+    revalidatePath(`/expressions/${expressionId}`);
   } catch (error) {
     return errorState(error);
   }
