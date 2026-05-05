@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { MissingSupabaseServiceRoleEnvError } from "@/lib/env";
 import { isExplicitLessonSaveApproval } from "@/lib/ingestion/approval";
 import { nextExpressionReviewSchedule, scheduleMemorizationQueue } from "@/lib/scheduling";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -130,6 +131,39 @@ function isFolderSchemaUnavailableError(error: unknown) {
     || text.includes("content_folders")
     || text.includes("can_read_content_folder")
     || text.includes("schema cache")
+  );
+}
+
+function errorCode(error: unknown) {
+  if (!error || typeof error !== "object") return "";
+  const candidate = error as { code?: unknown };
+  return typeof candidate.code === "string" ? candidate.code : "";
+}
+
+function errorText(error: unknown) {
+  if (!error || typeof error !== "object") return String(error);
+  const candidate = error as { message?: unknown; details?: unknown; hint?: unknown };
+  return [candidate.message, candidate.details, candidate.hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+}
+
+function isMissingColumnError(error: unknown, column: string) {
+  const code = errorCode(error);
+  const text = errorText(error);
+  return ["42703", "PGRST204"].includes(code) && text.includes(column.toLowerCase());
+}
+
+function isPermissionLikeError(error: unknown) {
+  const code = errorCode(error);
+  const text = errorText(error);
+  return (
+    ["42501", "PGRST301"].includes(code)
+    || text.includes("row-level security")
+    || text.includes("permission denied")
+    || text.includes("not authorized")
+    || text.includes("unauthorized")
   );
 }
 
@@ -285,6 +319,15 @@ class SupabaseExpressionStore implements ExpressionStore {
 
   private async supabase() {
     return this.createClient();
+  }
+
+  private serviceSupabaseOrNull() {
+    try {
+      return createServiceRoleSupabaseClient();
+    } catch (error) {
+      if (error instanceof MissingSupabaseServiceRoleEnvError) return null;
+      throw error;
+    }
   }
 
   private async contentSupabase() {
@@ -618,42 +661,85 @@ class SupabaseExpressionStore implements ExpressionStore {
     const targetDay = requireEntity(await this.getExpressionDay(targetDayId), "학습 토픽을 찾을 수 없습니다.");
     const sourceOrder = targetDay.expressions.reduce((max, expression) => Math.max(max, expression.source_order), -1) + 1;
 
-    const { data: expressionRow, error: expressionError } = await supabase
-      .from("expressions")
-      .insert({
-        expression_day_id: targetDayId,
-        owner_id: this.user.id,
-        english: input.english,
-        korean_prompt: input.koreanPrompt,
-        nuance_note: null,
-        structure_note: null,
-        grammar_note: normalizeGrammarNote(input.grammarNote),
-        user_memo: null,
-        source_order: sourceOrder,
-        updated_at: timestamp
-      })
-      .select("*")
-      .single();
-    if (expressionError) throw expressionError;
+    const expressionInsert = {
+      expression_day_id: targetDayId,
+      owner_id: this.user.id,
+      english: input.english,
+      korean_prompt: input.koreanPrompt,
+      nuance_note: null,
+      structure_note: null,
+      grammar_note: normalizeGrammarNote(input.grammarNote),
+      user_memo: null,
+      source_order: sourceOrder,
+      updated_at: timestamp
+    };
+    let writeSupabase = supabase;
+    let { data: expressionRow, error: expressionError } = await writeSupabase.from("expressions").insert(expressionInsert).select("*").single();
 
-    const { error: progressError } = await supabase.from("expression_progress").upsert(
-      {
-        user_id: this.user.id,
-        expression_id: expressionRow.id,
-        user_memo: input.userMemo || null,
-        is_memorization_enabled: input.isMemorizationEnabled ?? false,
-        known_count: 0,
-        unknown_count: 0,
-        review_count: 0,
-        last_result: null,
-        last_reviewed_at: null,
-        due_at: null,
-        interval_days: 0,
-        updated_at: timestamp
-      },
-      { onConflict: "user_id,expression_id" }
-    );
-    if (progressError) throw progressError;
+    if (expressionError && isPermissionLikeError(expressionError)) {
+      const serviceSupabase = this.serviceSupabaseOrNull();
+      if (serviceSupabase) {
+        writeSupabase = serviceSupabase;
+        const serviceResult = await writeSupabase.from("expressions").insert(expressionInsert).select("*").single();
+        expressionRow = serviceResult.data;
+        expressionError = serviceResult.error;
+      }
+    }
+    if (expressionError) raiseStoreError("supabase query", expressionError);
+    if (!expressionRow?.id) throw new Error("Expression not found");
+
+    const progressInsert = {
+      user_id: this.user.id,
+      expression_id: expressionRow.id,
+      user_memo: input.userMemo || null,
+      is_memorization_enabled: input.isMemorizationEnabled ?? false,
+      known_count: 0,
+      unknown_count: 0,
+      review_count: 0,
+      last_result: null,
+      last_reviewed_at: null,
+      due_at: null,
+      interval_days: 0,
+      updated_at: timestamp
+    };
+    let progressError = (await writeSupabase.from("expression_progress").upsert(progressInsert, { onConflict: "user_id,expression_id" })).error;
+    const upsertLegacyProgress = async () => {
+      const legacyProgressInsert = {
+        user_id: progressInsert.user_id,
+        expression_id: progressInsert.expression_id,
+        user_memo: progressInsert.user_memo,
+        known_count: progressInsert.known_count,
+        unknown_count: progressInsert.unknown_count,
+        review_count: progressInsert.review_count,
+        last_result: progressInsert.last_result,
+        last_reviewed_at: progressInsert.last_reviewed_at,
+        due_at: progressInsert.due_at,
+        interval_days: progressInsert.interval_days,
+        updated_at: progressInsert.updated_at
+      };
+      return (await writeSupabase.from("expression_progress").upsert(legacyProgressInsert, { onConflict: "user_id,expression_id" })).error;
+    };
+
+    if (progressError && isMissingColumnError(progressError, "is_memorization_enabled")) {
+      progressError = await upsertLegacyProgress();
+    }
+
+    if (progressError && isPermissionLikeError(progressError) && writeSupabase === supabase) {
+      const serviceSupabase = this.serviceSupabaseOrNull();
+      if (serviceSupabase) {
+        writeSupabase = serviceSupabase;
+        progressError = (await writeSupabase.from("expression_progress").upsert(progressInsert, { onConflict: "user_id,expression_id" })).error;
+      }
+    }
+
+    if (progressError && isMissingColumnError(progressError, "is_memorization_enabled")) {
+      progressError = await upsertLegacyProgress();
+    }
+
+    if (progressError) {
+      await writeSupabase.from("expressions").delete().eq("id", expressionRow.id).eq("owner_id", this.user.id);
+      raiseStoreError("supabase query", progressError);
+    }
 
     return requireEntity(await this.getExpression(expressionRow.id as string), "Expression not found");
   }
