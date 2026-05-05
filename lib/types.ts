@@ -18,9 +18,11 @@ export type ContentFolderSummary = {
 
 export type ExpressionDaySummary = {
   id: string;
+  owner_id?: string;
   title: string;
   source_note: string | null;
   day_date: string | null;
+  created_by?: "llm" | "user";
   folder_id?: string | null;
   folder?: ContentFolderSummary | null;
   /** Precomputed folder path from root to current folder for display formatting. */
@@ -52,6 +54,8 @@ export type ExpressionCard = {
   source_order: number;
   /** Whether the current signed-in user wants this expression in memorization cards. */
   is_memorization_enabled?: boolean;
+  /** Current signed-in user can delete this expression content. */
+  can_delete?: boolean;
   /** Current signed-in user's private review counters for this shared expression. */
   known_count: number;
   unknown_count: number;

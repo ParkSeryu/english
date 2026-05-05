@@ -54,6 +54,17 @@ export async function createPersonalExpressionAction(_previousState: ActionState
   redirect(`/expressions/${expressionId}`);
 }
 
+export async function deletePersonalExpressionAction(expressionId: string): Promise<void> {
+  const user = await requireCurrentUser();
+  const store = getExpressionStore(user);
+  const expression = await store.getExpression(expressionId);
+  const targetDayId = expression?.day?.id ?? expression?.expression_day_id ?? null;
+  await store.deletePersonalExpression(expressionId);
+  revalidateAppPaths();
+  revalidatePath(`/expressions/${expressionId}`);
+  redirect(targetDayId ? `/expressions?topic=${targetDayId}` : "/expressions");
+}
+
 async function recordExpressionReview(expressionId: string, result: "known" | "unknown") {
   if (result !== "known" && result !== "unknown") throw new Error("암기 결과가 올바르지 않습니다.");
   const user = await requireCurrentUser();
