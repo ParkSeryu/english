@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { requireCurrentUser } from "@/lib/auth";
-import { flattenZodErrors, parseCardMemoFormData, parseQuestionNoteFormData, parseQuestionNoteUpdateFormData } from "@/lib/validation";
+import { flattenZodErrors, parseCardMemoFormData, parsePersonalExpressionFormData, parseQuestionNoteFormData, parseQuestionNoteUpdateFormData } from "@/lib/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getExpressionStore } from "@/lib/lesson-store";
 import { passwordResetRedirectUrl } from "@/lib/site-url";
@@ -35,6 +35,34 @@ export async function updateExpressionMemoAction(expressionId: string, _previous
   } catch (error) {
     return errorState(error);
   }
+}
+
+export async function createPersonalExpressionAction(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parsePersonalExpressionFormData(formData);
+  if (!parsed.success) return { ok: false, fieldErrors: flattenZodErrors(parsed.error), message: "표현 내용을 확인해 주세요." };
+
+  let expressionId: string;
+  try {
+    const user = await requireCurrentUser();
+    const expression = await getExpressionStore(user).createPersonalExpression(parsed.data);
+    expressionId = expression.id;
+    revalidateAppPaths();
+  } catch (error) {
+    return errorState(error);
+  }
+
+  redirect(`/expressions/${expressionId}`);
+}
+
+export async function deletePersonalExpressionAction(expressionId: string): Promise<void> {
+  const user = await requireCurrentUser();
+  const store = getExpressionStore(user);
+  const expression = await store.getExpression(expressionId);
+  const targetDayId = expression?.day?.id ?? expression?.expression_day_id ?? null;
+  await store.deletePersonalExpression(expressionId);
+  revalidateAppPaths();
+  revalidatePath(`/expressions/${expressionId}`);
+  redirect(targetDayId ? `/expressions?topic=${targetDayId}` : "/expressions");
 }
 
 async function recordExpressionReview(expressionId: string, result: "known" | "unknown") {
