@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ExpressionReviewStats } from "@/components/ExpressionReviewStats";
 import { TopicFilterSelect } from "@/components/TopicFilterSelect";
 import { requireCurrentUser } from "@/lib/auth";
 import { getExpressionDueLabel } from "@/lib/expression-due-label";
@@ -53,7 +54,7 @@ export default async function ExpressionsPage({ searchParams }: { searchParams: 
 
                 return (
                 <Link key={expression.id} href={`/expressions/${expression.id}`} className="block rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-card">
-                  <div className="flex items-start justify-between gap-3"><h3 className="text-xl font-black text-ink">{expression.english}</h3><div className="shrink-0 space-y-0.5 text-xs font-semibold leading-4 text-slate-500"><div className="flex justify-end gap-1"><span>틀림</span><span className="tabular-nums">{expression.unknown_count}회</span></div><div className="flex justify-end gap-1"><span>외움</span><span className="tabular-nums">{expression.known_count}회</span></div></div></div>
+                  <div className="flex items-start justify-between gap-3"><h3 className="text-xl font-black text-ink">{expression.english}</h3><ExpressionReviewStats expression={expression} variant="stacked" /></div>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{expression.korean_prompt}</p>
                   {dueLabel ? <p className="mt-3 inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700">{dueLabel}</p> : null}
                   {expression.grammar_note ? <p className="mt-3 text-sm leading-6 text-slate-700"><span className="font-black text-slate-500">문법/패턴</span> {expression.grammar_note}</p> : null}
