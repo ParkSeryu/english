@@ -17,6 +17,23 @@ const payload: ExpressionIngestionPayload = {
 describe("MemoryExpressionStore integration behavior", () => {
   beforeEach(() => resetMemoryExpressionStoreForTests());
 
+  it("keeps lesson-store and expression-store compatibility exports aligned", async () => {
+    const lessonStore = await import("@/lib/lesson-store");
+    const expressionStore = await import("@/lib/expression-store");
+
+    expect(lessonStore.MemoryExpressionStore).toBe(MemoryExpressionStore);
+    expect(lessonStore.resetMemoryExpressionStoreForTests).toBe(resetMemoryExpressionStoreForTests);
+    expect(lessonStore.resetMemoryLessonStoreForTests).toBe(resetMemoryExpressionStoreForTests);
+    expect(lessonStore.MemoryLessonStore).toBe(MemoryExpressionStore);
+    expect(lessonStore.getLessonStore).toBe(lessonStore.getExpressionStore);
+    expect(lessonStore.getAdminLessonStore).toBe(lessonStore.getAdminExpressionStore);
+
+    expect(expressionStore.MemoryExpressionStore).toBe(lessonStore.MemoryExpressionStore);
+    expect(expressionStore.resetMemoryExpressionStoreForTests).toBe(lessonStore.resetMemoryExpressionStoreForTests);
+    expect(expressionStore.getExpressionStore).toBe(lessonStore.getExpressionStore);
+    expect(expressionStore.getAdminExpressionStore).toBe(lessonStore.getAdminExpressionStore);
+  });
+
   it("drafts, revises, approves, reviews, memos, and questions without inserting before approval", async () => {
     const store = new MemoryExpressionStore(userA);
     const draft = await store.createDraft(payload);

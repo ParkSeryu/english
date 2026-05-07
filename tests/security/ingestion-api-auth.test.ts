@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const authHelper = readFileSync("lib/ingestion/request-auth.ts", "utf8");
 const approveRoute = readFileSync("app/api/ingestion/runs/[id]/approve/route.ts", "utf8");
-const expressionStore = readFileSync("lib/lesson-store.ts", "utf8");
+const expressionStore = readFileSync("lib/expression-store/supabase-store.ts", "utf8");
 
 describe("LLM ingestion route safety", () => {
   it("requires bearer token authentication before ingestion routes run", () => {
