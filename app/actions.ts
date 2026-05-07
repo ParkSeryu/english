@@ -8,8 +8,10 @@ import { requireCurrentUser } from "@/lib/auth";
 import { flattenZodErrors, parseCardMemoFormData, parsePersonalExpressionFormData, parsePersonalExpressionUpdateFormData, parseQuestionNoteFormData, parseQuestionNoteUpdateFormData } from "@/lib/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getExpressionStore } from "@/lib/lesson-store";
+import { createPersonalExpression, deletePersonalExpression, recordExpressionReview, updateExpressionMemo, updatePersonalExpression } from "@/lib/use-cases/expressions";
+import { createQuestionNote, updateQuestionNote, updateQuestionStatus } from "@/lib/use-cases/questions";
 import { passwordResetRedirectUrl } from "@/lib/site-url";
-import { QUESTION_NOTE_STATUSES, type ActionState, type QuestionNoteStatus } from "@/lib/types";
+import { type ActionState, type QuestionNoteStatus } from "@/lib/types";
 
 function revalidateAppPaths() {
   revalidatePath("/");
@@ -28,7 +30,7 @@ export async function updateExpressionMemoAction(expressionId: string, _previous
 
   try {
     const user = await requireCurrentUser();
-    await getExpressionStore(user).updateExpressionMemo(expressionId, parsed.data);
+    await updateExpressionMemo(getExpressionStore(user), expressionId, parsed.data);
     revalidateAppPaths();
     revalidatePath(`/expressions/${expressionId}`);
     return { ok: true, message: "메모를 저장했습니다." };
@@ -44,8 +46,7 @@ export async function createPersonalExpressionAction(_previousState: ActionState
   let expressionId: string;
   try {
     const user = await requireCurrentUser();
-    const expression = await getExpressionStore(user).createPersonalExpression(parsed.data);
-    expressionId = expression.id;
+    expressionId = await createPersonalExpression(getExpressionStore(user), parsed.data);
     revalidateAppPaths();
   } catch (error) {
     return errorState(error);
@@ -60,7 +61,7 @@ export async function updatePersonalExpressionAction(expressionId: string, _prev
 
   try {
     const user = await requireCurrentUser();
-    await getExpressionStore(user).updatePersonalExpression(expressionId, parsed.data);
+    await updatePersonalExpression(getExpressionStore(user), expressionId, parsed.data);
     revalidateAppPaths();
     revalidatePath(`/expressions/${expressionId}`);
   } catch (error) {
@@ -72,30 +73,26 @@ export async function updatePersonalExpressionAction(expressionId: string, _prev
 
 export async function deletePersonalExpressionAction(expressionId: string): Promise<void> {
   const user = await requireCurrentUser();
-  const store = getExpressionStore(user);
-  const expression = await store.getExpression(expressionId);
-  const targetDayId = expression?.day?.id ?? expression?.expression_day_id ?? null;
-  await store.deletePersonalExpression(expressionId);
+  const targetPath = await deletePersonalExpression(getExpressionStore(user), expressionId);
   revalidateAppPaths();
   revalidatePath(`/expressions/${expressionId}`);
-  redirect(targetDayId ? `/expressions?topic=${targetDayId}` : "/expressions");
+  redirect(targetPath);
 }
 
-async function recordExpressionReview(expressionId: string, result: "known" | "unknown") {
-  if (result !== "known" && result !== "unknown") throw new Error("암기 결과가 올바르지 않습니다.");
+async function recordExpressionReviewForCurrentUser(expressionId: string, result: "known" | "unknown") {
   const user = await requireCurrentUser();
-  await getExpressionStore(user).recordReviewResult(expressionId, result);
+  await recordExpressionReview(getExpressionStore(user), expressionId, result);
   revalidateAppPaths();
   revalidatePath(`/expressions/${expressionId}`);
 }
 
 export async function recordExpressionReviewAction(expressionId: string, result: "known" | "unknown", returnTo = "/memorize") {
-  await recordExpressionReview(expressionId, result);
+  await recordExpressionReviewForCurrentUser(expressionId, result);
   redirect(returnTo.startsWith("/") ? returnTo : "/memorize");
 }
 
 export async function recordExpressionReviewInPlaceAction(expressionId: string, result: "known" | "unknown") {
-  await recordExpressionReview(expressionId, result);
+  await recordExpressionReviewForCurrentUser(expressionId, result);
   return { ok: true };
 }
 
@@ -105,7 +102,7 @@ export async function createQuestionNoteAction(_previousState: ActionState, form
 
   try {
     const user = await requireCurrentUser();
-    await getExpressionStore(user).createQuestionNote(parsed.data);
+    await createQuestionNote(getExpressionStore(user), parsed.data);
     revalidateAppPaths();
     return { ok: true, message: "질문거리를 추가했습니다." };
   } catch (error) {
@@ -114,9 +111,8 @@ export async function createQuestionNoteAction(_previousState: ActionState, form
 }
 
 export async function updateQuestionStatusAction(questionId: string, status: QuestionNoteStatus) {
-  if (!QUESTION_NOTE_STATUSES.includes(status)) throw new Error("질문 상태가 올바르지 않습니다.");
   const user = await requireCurrentUser();
-  await getExpressionStore(user).updateQuestionNote(questionId, { status });
+  await updateQuestionStatus(getExpressionStore(user), questionId, status);
   revalidateAppPaths();
 }
 
@@ -126,7 +122,7 @@ export async function updateQuestionNoteAction(questionId: string, _previousStat
 
   try {
     const user = await requireCurrentUser();
-    await getExpressionStore(user).updateQuestionNote(questionId, parsed.data);
+    await updateQuestionNote(getExpressionStore(user), questionId, parsed.data);
     revalidateAppPaths();
     return { ok: true, message: "질문거리와 답변 메모를 저장했습니다." };
   } catch (error) {
